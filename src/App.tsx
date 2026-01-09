@@ -1,5 +1,10 @@
+import { useState } from "react";
 import type { Chef } from "./types/chef";
 import { ChefCard } from "./components/ChefCard";
+import { InitialScreen } from "./components/InitialScreen";
+import { useChefStore } from "./store/useChefStore";
+
+type GameState = "intro" | "playing" | "result";
 
 const SAMPLE_BLACK_SPOON: Chef = {
   id: "black-1",
@@ -28,6 +33,18 @@ const SAMPLE_WHITE_SPOON: Chef = {
 };
 
 function App() {
+  const [gameState, setGameState] = useState<GameState>("intro");
+  const { initializeGame } = useChefStore();
+
+  const handleStartGame = () => {
+    initializeGame();
+    setGameState("playing");
+  };
+
+  if (gameState === "intro") {
+    return <InitialScreen onStart={handleStartGame} />;
+  }
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-8 gap-12">
       <div className="text-center space-y-2">
