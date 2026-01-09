@@ -8,6 +8,8 @@ export interface ChefStats {
   speed: number; // 속도 (5th stat)
 }
 
+export type ChefStatus = "alive" | "eliminated";
+
 export interface Chef {
   id: string;
   name: string; // 실명 (랜덤 생성)
@@ -18,6 +20,9 @@ export interface Chef {
   specialty: string;
   image?: string;
   bio?: string;
+  status: ChefStatus; // 생존 상태
+  eliminatedRound?: number; // 탈락한 라운드
+  isPlayerPick?: boolean; // 플레이어 예측 여부
 }
 
 export type CuisineType =

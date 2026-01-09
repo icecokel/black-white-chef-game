@@ -17,13 +17,14 @@ export const ChefCard = ({
   className,
 }: ChefCardProps) => {
   const isBlack = chef.rank === "BLACK";
+  const isEliminated = chef.status === "eliminated";
   const placeholderImage = "/chef-placeholder.png";
 
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9, y: 20 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
-      whileHover={{ scale: 1.02, y: -5 }}
+      whileHover={isEliminated ? {} : { scale: 1.02, y: -5 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
       onClick={onClick}
       className={cn(
@@ -31,9 +32,26 @@ export const ChefCard = ({
         isBlack
           ? "bg-spoon-black-bg border border-spoon-black-border shadow-spoon-black-accent/10"
           : "bg-spoon-white-bg border border-spoon-white-border shadow-spoon-white-accent/10",
+        isEliminated && "opacity-50 grayscale pointer-events-none",
+        chef.isPlayerPick &&
+          !isEliminated &&
+          "ring-2 ring-yellow-400 ring-offset-2 ring-offset-background",
         className
       )}
     >
+      {/* 탈락 라운드 배지 */}
+      {isEliminated && chef.eliminatedRound && (
+        <div className="absolute top-2 right-2 z-30 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+          R{chef.eliminatedRound} 탈락
+        </div>
+      )}
+
+      {/* 플레이어 픽 표시 */}
+      {chef.isPlayerPick && !isEliminated && (
+        <div className="absolute top-2 right-2 z-30 bg-yellow-400 text-black text-xs px-2 py-1 rounded-full font-bold">
+          ⭐ 픽
+        </div>
+      )}
       {/* Texture / Background Effect */}
       <div
         className={cn(

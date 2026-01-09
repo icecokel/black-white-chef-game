@@ -2,15 +2,30 @@ import { useChefStore } from "../store/useChefStore";
 import { ChefCard } from "./ChefCard";
 import { motion } from "framer-motion";
 
-export const ChefGrid = () => {
-  const { chefs } = useChefStore();
+interface ChefGridProps {
+  enablePick?: boolean; // 픽 모드 활성화
+}
+
+export const ChefGrid = ({ enablePick = false }: ChefGridProps) => {
+  const { getSortedChefs, toggleUserPick, currentRound } = useChefStore();
+  const sortedChefs = getSortedChefs();
+
+  const handleCardClick = (chefId: string) => {
+    if (enablePick && !currentRound) {
+      toggleUserPick(chefId);
+    }
+  };
 
   return (
     <div className="w-full max-w-7xl mx-auto p-4 md:p-8">
+      {enablePick && !currentRound && (
+        <div className="mb-4 p-3 bg-yellow-400/10 border border-yellow-400/30 rounded-lg text-center text-sm">
+          💡 합격할 것 같은 흑수저를 클릭하여 선택하세요!
+        </div>
+      )}
       <div className="grid grid-cols-5 gap-4 md:gap-6">
-        {chefs.map((chef, index) => {
-          // 간단한 선형 딜레이: 순서대로 등장
-          const delay = index * 0.03; // 0.03초 간격으로 등장
+        {sortedChefs.map((chef, index) => {
+          const delay = index * 0.02;
 
           return (
             <motion.div
@@ -21,7 +36,10 @@ export const ChefGrid = () => {
               className="col-span-1"
             >
               <div className="w-full">
-                <ChefCard chef={chef} />
+                <ChefCard
+                  chef={chef}
+                  onClick={() => handleCardClick(chef.id)}
+                />
               </div>
             </motion.div>
           );

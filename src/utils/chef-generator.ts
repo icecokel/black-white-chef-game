@@ -82,6 +82,7 @@ export const generateChef = (rank: ChefRank): Chef => {
     cuisine: getRandomElement(CUISINES),
     specialty: getRandomElement(SPECIALTIES),
     bio: rank === "WHITE" ? "대한민국 최고의 요리사" : "재야의 숨은 고수",
+    status: "alive",
   };
 };
 
