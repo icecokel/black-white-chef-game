@@ -112,8 +112,6 @@ const getMatchResultRow = (
 
   const winnerId = match.winnerId;
   const isBlackWin = winnerId === blackChef.id;
-  const isUserPickIncluded =
-    userPicks.includes(blackChef.id) || userPicks.includes(whiteChef.id);
 
   // 심사평 하나 랜덤 가져오기 (P or A)
   const comment = match.votes[0]?.comment || "심사평 없음";

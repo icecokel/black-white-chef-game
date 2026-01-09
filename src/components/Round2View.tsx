@@ -91,7 +91,7 @@ const Round2MatchDetail = ({
   myPickSide: "BLACK" | "WHITE" | null;
   isUserPickMatch: boolean;
 }) => {
-  const { chefs, judgeMatch } = useChefStore();
+  const { chefs } = useChefStore();
   const [showResult, setShowResult] = useState(false);
 
   // 자동 재생 연출 (심사 대기 -> 결과 공개)

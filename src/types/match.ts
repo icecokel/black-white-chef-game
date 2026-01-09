@@ -30,6 +30,7 @@ export interface Match {
   mainIngredient?: string; // 주재료 (Round 2)
   votes: Vote[]; // 심사위원 투표
   winnerId?: string; // 승자 ID
+  loserId?: string; // 패자 ID
   isTie: boolean; // 보류 상태 (1:1)
   status: "ready" | "cooking" | "judging" | "completed";
 }
