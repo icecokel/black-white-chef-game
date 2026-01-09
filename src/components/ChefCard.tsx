@@ -28,7 +28,7 @@ export const ChefCard = ({
   const isBlack = chef.rank === "BLACK";
   const isEliminated = chef.status === "eliminated";
   const isPending = chef.status === "pending";
-  const placeholderImage = "/chef-placeholder.png";
+  const placeholderImage = `${import.meta.env.BASE_URL}chef-placeholder.png`;
 
   return (
     <div
@@ -128,8 +128,12 @@ export const ChefCard = ({
             className={cn(
               "absolute inset-0 opacity-20 pointer-events-none mix-blend-overlay",
               isBlack
-                ? "bg-[url('/paper-texture.png')] bg-repeat"
-                : "bg-[url('/marble-texture.png')] bg-cover"
+                ? `bg-[url('${
+                    import.meta.env.BASE_URL
+                  }paper-texture.png')] bg-repeat`
+                : `bg-[url('${
+                    import.meta.env.BASE_URL
+                  }marble-texture.png')] bg-cover`
             )}
           />
 
