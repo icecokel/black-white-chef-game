@@ -4,7 +4,6 @@ import { useChefStore } from "../store/useChefStore";
 import { ChefCard } from "./ChefCard";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
-import type { JudgingResult } from "../types/round";
 import type { Chef } from "../types/chef";
 
 export const Round1View = () => {

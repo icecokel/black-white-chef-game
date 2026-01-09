@@ -366,20 +366,61 @@ export const useChefStore = create<ChefStore>((set, get) => ({
           messages,
         };
       } else if (remainingSlots > 0 && pendingChefIds.length === 0) {
-        // 보류 인원도 없는데 목표 미달인 경우 (이론상 발생 희박하지만 처리)
-        // 그냥 종료 or 에러 메시지? 현재는 그냥 종료 처리
-        set((state) => ({
-          currentRound: state.currentRound
-            ? {
-                ...state.currentRound,
-                status: "completed",
-                messageLog: [
-                  ...state.currentRound.messageLog,
-                  "⚠️ 합격자 부족으로 라운드 종료",
-                ],
-              }
-            : null,
-        }));
+        // 보류 인원도 없는데 목표 미달인 경우 -> 탈락자 재심사
+        const { eliminatedChefIds } = currentRound;
+        const eliminatedChefs = eliminatedChefIds
+          .map((id) => chefs.find((c) => c.id === id))
+          .filter((c): c is Chef => c !== undefined)
+          .sort((a, b) => {
+            const sumA = Object.values(a.stats).reduce((acc, v) => acc + v, 0);
+            const sumB = Object.values(b.stats).reduce((acc, v) => acc + v, 0);
+            return sumB - sumA; // 총점 내림차순
+          });
+
+        const chefsToRevive = eliminatedChefs.slice(0, remainingSlots);
+        const revivedIds = chefsToRevive.map((c) => c.id);
+        const revivedNames = chefsToRevive.map((c) => c.nickname).join(", ");
+
+        const messages =
+          revivedIds.length > 0
+            ? [`🔄 탈락자 재심사 결과: ${revivedNames} 부활!`]
+            : ["⚠️ 합격자 부족으로 라운드 종료"];
+
+        set((state) => {
+          const updatedChefs = state.chefs.map((c) => {
+            if (revivedIds.includes(c.id)) {
+              return {
+                ...c,
+                status: "alive" as const,
+                eliminatedRound: undefined,
+              };
+            }
+            return c;
+          });
+
+          return {
+            chefs: updatedChefs,
+            currentRound: state.currentRound
+              ? {
+                  ...state.currentRound,
+                  passedChefIds: [
+                    ...state.currentRound.passedChefIds,
+                    ...revivedIds,
+                  ],
+                  eliminatedChefIds:
+                    state.currentRound.eliminatedChefIds.filter(
+                      (id) => !revivedIds.includes(id)
+                    ),
+                  status: "completed",
+                  messageLog: [
+                    ...state.currentRound.messageLog,
+                    ...messages,
+                    "🏆 라운드 1 완료!",
+                  ],
+                }
+              : null,
+          };
+        });
         return null;
       }
       return null;

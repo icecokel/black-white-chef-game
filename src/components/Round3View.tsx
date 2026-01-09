@@ -37,6 +37,7 @@ export const Round3View = () => {
       mental: 95,
       speed: 95,
     },
+    revealedStats: ["taste", "creativity", "proficiency", "mental", "speed"],
     isPlayerPick: false,
   });
 
