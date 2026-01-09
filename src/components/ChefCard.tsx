@@ -8,17 +8,23 @@ export interface ChefCardProps {
   chef: Chef;
   isRevealed?: boolean;
   isFlipped?: boolean;
+  revealedStat?: keyof import("@/types/chef").ChefStats;
   judgingResult?: JudgingResult;
   onClick?: () => void;
   className?: string;
+  layout?: "vertical" | "horizontal";
+  maskStats?: boolean;
 }
 
 export const ChefCard = ({
   chef,
   isFlipped = false,
+  revealedStat,
   judgingResult,
   onClick,
   className,
+  layout = "vertical",
+  maskStats = false,
 }: ChefCardProps) => {
   const isBlack = chef.rank === "BLACK";
   const isEliminated = chef.status === "eliminated";
@@ -64,7 +70,8 @@ export const ChefCard = ({
             isPending && "ring-2 ring-yellow-500",
             chef.isPlayerPick &&
               !isEliminated &&
-              "ring-2 ring-yellow-400 ring-offset-2 ring-offset-background"
+              "ring-2 ring-yellow-400 ring-offset-2 ring-offset-background",
+            layout === "horizontal" && "flex flex-row h-32"
           )}
           style={{
             backfaceVisibility: "hidden",
@@ -123,7 +130,12 @@ export const ChefCard = ({
           />
 
           {/* Image Section */}
-          <div className="relative w-full aspect-[4/3] overflow-hidden">
+          <div
+            className={cn(
+              "relative overflow-hidden",
+              layout === "horizontal" ? "w-1/3 h-full" : "w-full aspect-[4/3]"
+            )}
+          >
             <img
               src={chef.image || placeholderImage}
               alt={isBlack ? chef.nickname : chef.name}
@@ -140,16 +152,24 @@ export const ChefCard = ({
                 variant={isBlack ? "black" : "white"}
                 className="uppercase tracking-widest text-[10px] px-2 py-1"
               >
-                {isBlack ? "Black Spoon" : "White Spoon"}
+                {isBlack ? "Black" : "White"}
               </Badge>
             </div>
           </div>
 
           {/* Content */}
-          <div className="relative z-10 p-4 flex flex-col gap-2">
+          <div
+            className={cn(
+              "relative z-10 p-4 flex flex-col justify-center gap-1",
+              layout === "horizontal" ? "w-2/3 pl-2 py-2" : "w-full"
+            )}
+          >
             <h3
               className={cn(
-                "text-lg font-bold leading-tight break-keep min-h-[2.75rem]",
+                "font-bold leading-tight break-keep",
+                layout === "horizontal"
+                  ? "text-base line-clamp-1 mb-1"
+                  : "text-lg min-h-[4.2rem] line-clamp-3",
                 isBlack
                   ? "text-spoon-black-text font-sans tracking-tight"
                   : "text-spoon-white-text font-serif italic"
@@ -158,68 +178,91 @@ export const ChefCard = ({
               {isBlack ? chef.nickname : chef.name}
             </h3>
 
-            {!isBlack && (
-              <div
-                className={cn(
-                  "pt-2 border-t flex flex-col gap-0.5",
-                  "border-spoon-white-border/30"
-                )}
-              >
-                <StatRow
-                  label="맛"
-                  value={chef.stats.taste}
-                  isBlack={isBlack}
-                />
-                <StatRow
-                  label="창의력"
-                  value={chef.stats.creativity}
-                  isBlack={isBlack}
-                />
-                <StatRow
-                  label="숙련도"
-                  value={chef.stats.proficiency}
-                  isBlack={isBlack}
-                />
-                <StatRow
-                  label="멘탈"
-                  value={chef.stats.mental}
-                  isBlack={isBlack}
-                />
-                <StatRow
-                  label="속도"
-                  value={chef.stats.speed}
-                  isBlack={isBlack}
-                />
-              </div>
-            )}
-
-            {isBlack && (
-              <div className="pt-2 border-t border-spoon-black-border/30 opacity-70 text-xs text-center font-mono">
-                {(() => {
-                  // ID 기반 해시로 고정된 힌트 결정 (0~5)
-                  const hash = chef.id.split("").reduce((acc, char) => {
-                    return char.charCodeAt(0) + ((acc << 5) - acc);
-                  }, 0);
-                  const hintIndex = Math.abs(hash) % 6;
-
-                  switch (hintIndex) {
-                    case 0:
-                      return `맛: ${chef.stats.taste}`;
-                    case 1:
-                      return `창의력: ${chef.stats.creativity}`;
-                    case 2:
-                      return `숙련도: ${chef.stats.proficiency}`;
-                    case 3:
-                      return `멘탈: ${chef.stats.mental}`;
-                    case 4:
-                      return `속도: ${chef.stats.speed}`;
-                    case 5:
-                    default:
-                      return `장르: ${chef.cuisine}`;
-                  }
-                })()}
-              </div>
-            )}
+            <div
+              className={cn(
+                "flex flex-col gap-0.5",
+                !isBlack &&
+                  layout !== "horizontal" &&
+                  "pt-2 border-t border-spoon-white-border/30",
+                layout === "horizontal" && "text-[10px]"
+              )}
+            >
+              {/* Horizontal Layout: Always show stats (masked if needed) */}
+              {layout === "horizontal" ? (
+                <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                  <StatMinimal
+                    label="맛"
+                    value={chef.stats.taste}
+                    isBlack={isBlack}
+                    mask={maskStats}
+                  />
+                  <StatMinimal
+                    label="창의"
+                    value={chef.stats.creativity}
+                    isBlack={isBlack}
+                    mask={maskStats}
+                  />
+                  <StatMinimal
+                    label="숙련"
+                    value={chef.stats.proficiency}
+                    isBlack={isBlack}
+                    mask={maskStats}
+                  />
+                  <StatMinimal
+                    label="멘탈"
+                    value={chef.stats.mental}
+                    isBlack={isBlack}
+                    mask={maskStats}
+                  />
+                  <StatMinimal
+                    label="속도"
+                    value={chef.stats.speed}
+                    isBlack={isBlack}
+                    mask={maskStats}
+                  />
+                </div>
+              ) : // Vertical Layout (Legacy logic)
+              !isBlack ? (
+                <>
+                  <StatRow
+                    label="맛"
+                    value={chef.stats.taste}
+                    isBlack={isBlack}
+                  />
+                  <StatRow
+                    label="창의력"
+                    value={chef.stats.creativity}
+                    isBlack={isBlack}
+                  />
+                  <StatRow
+                    label="숙련도"
+                    value={chef.stats.proficiency}
+                    isBlack={isBlack}
+                  />
+                  <StatRow
+                    label="멘탈"
+                    value={chef.stats.mental}
+                    isBlack={isBlack}
+                  />
+                  <StatRow
+                    label="속도"
+                    value={chef.stats.speed}
+                    isBlack={isBlack}
+                  />
+                </>
+              ) : (
+                <div className="pt-2 border-t border-spoon-black-border/30 opacity-70 text-xs text-center font-mono">
+                  {revealedStat ? (
+                    <div className="flex justify-center items-center gap-2 text-amber-500 font-bold">
+                      <span>🔓 {revealedStat.toUpperCase()}:</span>
+                      <span>{chef.stats[revealedStat]}</span>
+                    </div>
+                  ) : (
+                    "비공개 쉐프"
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </motion.div>
       </motion.div>
@@ -249,6 +292,37 @@ const StatRow = ({
       )}
     >
       {value}
+    </span>
+  </div>
+);
+
+const StatMinimal = ({
+  label,
+  value,
+  isBlack,
+  mask,
+}: {
+  label: string;
+  value: number;
+  isBlack: boolean;
+  mask: boolean;
+}) => (
+  <div className="flex justify-between items-center opacity-80">
+    <span
+      className={cn(
+        isBlack ? "text-spoon-black-text" : "text-spoon-white-text",
+        "opacity-70"
+      )}
+    >
+      {label}
+    </span>
+    <span
+      className={cn(
+        "font-mono font-bold",
+        isBlack ? "text-spoon-black-accent" : "text-spoon-white-accent"
+      )}
+    >
+      {mask ? "??" : value}
     </span>
   </div>
 );

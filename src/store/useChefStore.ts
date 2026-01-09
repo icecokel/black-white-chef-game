@@ -6,6 +6,7 @@ import {
   ROUND_1_USER_PICK_LIMIT,
 } from "../types/round";
 import { generateAllChefs } from "../utils/chef-generator";
+import { generateDish, MAIN_INGREDIENTS } from "../utils/dish-generator";
 import { judgeChef, sortChefList } from "../utils/round-logic";
 
 const JUDGING_BATCH_SIZE = 4; // 4명씩 채점
@@ -36,6 +37,8 @@ interface ChefStore {
   startRound1Judging: () => void;
   advanceRound1Cooking: () => CookingResult | null;
   advanceRound1Judging: () => JudgingBatchResult | null;
+  startRound2: () => void;
+  judgeMatch: (matchId: string) => void;
   isRoundComplete: () => boolean;
 }
 
@@ -362,8 +365,193 @@ export const useChefStore = create<ChefStore>((set, get) => ({
     };
   },
 
+  startRound2: () => {
+    const { chefs, currentRound } = get();
+    // 1라운드가 완료되지 않았으면 실행 불가
+    if (
+      !currentRound ||
+      currentRound.roundNumber !== 1 ||
+      currentRound.status !== "completed"
+    )
+      return;
+
+    // 생존자 필터링
+    const aliveBlack = chefs.filter(
+      (c) => c.rank === "BLACK" && c.status === "alive"
+    );
+    const aliveWhite = chefs.filter(
+      (c) => c.rank === "WHITE" && c.status === "alive"
+    );
+
+    // 랜덤 셔플
+    const shuffledBlack = [...aliveBlack].sort(() => Math.random() - 0.5);
+    const shuffledWhite = [...aliveWhite].sort(() => Math.random() - 0.5);
+
+    // 1:1 매칭 생성 및 요리(Dish) 준비
+    const matches: any[] = []; // Match type import needed, using any for now to avoid circular dependency issues in inline code if not imported
+
+    // 최소 길이만큼 매칭 (남는 인원은 부전승 처리 등 추후 고려, 일단 10vs10 가정)
+    const matchCount = Math.min(shuffledBlack.length, shuffledWhite.length);
+
+    // 재료 생성 (10개 유니크)
+    const ingredients = [...MAIN_INGREDIENTS]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, matchCount);
+
+    for (let i = 0; i < matchCount; i++) {
+      const mainIngredient = ingredients[i];
+      matches.push({
+        id: `match-${i + 1}`,
+        blackChefId: shuffledBlack[i].id,
+        whiteChefId: shuffledWhite[i].id,
+        mainIngredient: mainIngredient,
+        // 요리 생성 (스탯 기반 + 주재료)
+        blackDish: generateDish(shuffledBlack[i], mainIngredient),
+        whiteDish: generateDish(shuffledWhite[i], mainIngredient),
+        votes: [],
+        isTie: false,
+        status: "ready",
+      });
+    }
+
+    const newRound: Round = {
+      roundNumber: 2,
+      status: "cooking", // 2라운드는 바로 요리(매칭 확인)부터 시작
+      matches: matches,
+      cookingChefIds: [], // 사용 안함
+      judgingQueue: [], // 사용 안함
+      currentJudgingIndex: 0,
+      passedChefIds: [],
+      pendingChefIds: [],
+      eliminatedChefIds: [],
+      targetPassCount: 10,
+      userPickLimit: 0,
+      cycleComplete: false,
+      messageLog: [
+        "⚔️ 라운드 2: 1vs1 흑백 대전 시작!",
+        "조별 1:1 매칭이 완료되었습니다.",
+      ],
+    };
+
+    set({ currentRound: newRound });
+  },
+
+  judgeMatch: (matchId: string) => {
+    const { currentRound } = get();
+    if (
+      !currentRound ||
+      currentRound.roundNumber !== 2 ||
+      !currentRound.matches
+    )
+      return;
+
+    const matchIndex = currentRound.matches.findIndex((m) => m.id === matchId);
+    if (matchIndex === -1) return;
+
+    const match = currentRound.matches[matchIndex];
+    if (match.status === "completed" || !match.blackDish || !match.whiteDish)
+      return; // 이미 완료되었거나 요리가 없으면 중단
+
+    // 심사 로직
+    const { blackDish, whiteDish } = match;
+
+    // Judge P (Taste 70%, Completeness 30%)
+    const scoreP_Black =
+      blackDish.scores.taste * 0.7 + blackDish.scores.completeness * 0.3;
+    const scoreP_White =
+      whiteDish.scores.taste * 0.7 + whiteDish.scores.completeness * 0.3;
+    const voteP = scoreP_Black >= scoreP_White ? "black" : "white";
+
+    // Judge A (Completeness 40%, Creativity 30%, Taste 30%)
+    // 특수 룰: 완성도가 50 미만이면 무조건 탈락 점수 처리 (0점 취급)
+    const effectiveCompletenessBlack =
+      blackDish.scores.completeness < 50 ? 0 : blackDish.scores.completeness;
+    const effectiveCompletenessWhite =
+      whiteDish.scores.completeness < 50 ? 0 : whiteDish.scores.completeness;
+
+    const scoreA_Black =
+      effectiveCompletenessBlack * 0.4 +
+      blackDish.scores.creativity * 0.3 +
+      blackDish.scores.taste * 0.3;
+    const scoreA_White =
+      effectiveCompletenessWhite * 0.4 +
+      whiteDish.scores.creativity * 0.3 +
+      whiteDish.scores.taste * 0.3;
+    const voteA = scoreA_Black >= scoreA_White ? "black" : "white";
+
+    // 결과 처리
+    let winnerId: string | undefined;
+    let isTie = false;
+
+    const votes = [
+      {
+        judge: "P" as const,
+        pick: voteP === "black" ? match.blackChefId : match.whiteChefId,
+        comment: "맛이 중요하쥬.",
+      },
+      {
+        judge: "A" as const,
+        pick: voteA === "black" ? match.blackChefId : match.whiteChefId,
+        comment: "의도가 잘 보이네요.",
+      },
+    ];
+
+    if (voteP === voteA) {
+      // 만장일치
+      winnerId = voteP === "black" ? match.blackChefId : match.whiteChefId;
+    } else {
+      // 1:1 무승부 (보류) -> 난상토론 로직 (랜덤 승자)
+      // 안성재의 의견이 조금 더 반영될 확률? (일단 50:50)
+      isTie = true;
+      winnerId = Math.random() < 0.5 ? match.blackChefId : match.whiteChefId;
+      // 보류여도 승자는 결정해야 다음 진행 가능하므로 winnerId는 설정하되, UI에서 '보류 후 결정' 연출 가능
+    }
+
+    // Update Round State
+    set((state) => {
+      if (!state.currentRound || !state.currentRound.matches)
+        return { currentRound: state.currentRound };
+
+      const updatedMatches = [...state.currentRound.matches];
+      updatedMatches[matchIndex] = {
+        ...match,
+        votes,
+        winnerId,
+        isTie,
+        status: "completed",
+      };
+
+      const updatedPassedIds = [
+        ...state.currentRound.passedChefIds,
+        ...(winnerId ? [winnerId] : []),
+      ];
+      const updatedEliminatedIds = [
+        ...state.currentRound.eliminatedChefIds,
+        ...(winnerId
+          ? winnerId === match.blackChefId
+            ? [match.whiteChefId]
+            : [match.blackChefId]
+          : []),
+      ];
+
+      return {
+        currentRound: {
+          ...state.currentRound,
+          matches: updatedMatches,
+          passedChefIds: updatedPassedIds,
+          eliminatedChefIds: updatedEliminatedIds,
+        },
+      };
+    });
+  },
+
   isRoundComplete: () => {
     const { currentRound } = get();
     return currentRound?.status === "completed";
   },
 }));
+
+// Debug hook for testing
+if (typeof window !== "undefined") {
+  (window as any).chefStore = useChefStore;
+}

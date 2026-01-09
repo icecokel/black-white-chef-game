@@ -24,6 +24,7 @@ export const Round1View = () => {
     startRound1Judging,
     advanceRound1Cooking,
     advanceRound1Judging,
+    startRound2,
   } = useChefStore();
 
   const [batchState, setBatchState] = useState<BatchState | null>(null);
@@ -309,6 +310,14 @@ export const Round1View = () => {
           Round {currentRound.roundNumber} 완료!
         </h2>
 
+        <Button
+          size="lg"
+          onClick={() => startRound2()}
+          className="bg-white text-black hover:bg-gray-200 font-bold text-lg px-8 py-6 animate-pulse"
+        >
+          ⚔️ 2라운드 시작하기
+        </Button>
+
         <div className="flex gap-8 text-center">
           <div>
             <p className="text-4xl font-bold text-green-500">
@@ -344,10 +353,6 @@ export const Round1View = () => {
             ))}
           </div>
         </div>
-
-        <Button className="mt-8" disabled>
-          다음 라운드 (준비 중)
-        </Button>
       </div>
     );
   }

@@ -1,9 +1,11 @@
-export type RoundStatus = "picking" | "judging" | "completed";
+export type RoundStatus = "picking" | "cooking" | "judging" | "completed";
+import type { Match } from "./match";
 export type JudgingResult = "pass" | "pending" | "fail";
 
 export interface Round {
   roundNumber: number;
   status: RoundStatus;
+  matches?: Match[]; // 2라운드용 매치 정보
   cookingChefIds: string[]; // 요리 중인 쉐프 ID
   judgingQueue: string[]; // 채점 대기 큐 (요리 완료된 쉐프 ID)
   currentJudgingIndex: number; // 현재 채점 인덱스
