@@ -1,73 +1,51 @@
-# React + TypeScript + Vite
+# 🍳 Culinary Class Wars: Last Spoon Standing
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> **80명의 흑수저와 20명의 백수저, 당신의 안목으로 최후의 1인을 선택하세요!**
 
-Currently, two official plugins are available:
+이 프로젝트는 넷플릭스 예능 <흑백요리사: 요리 계급 전쟁>을 모티브로 한 **승자 예측 시뮬레이션 웹 게임**입니다. 매 라운드 무작위로 생성되는 요리사들의 능력치와 프로필을 확인하고, 누가 다음 라운드에 진출할지 결정하여 최종 우승자를 맞혀보세요.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## 🃏 카드 기반 게임 시스템 (Card-Based Gameplay)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+본 게임은 모든 요리사가 **정보 카드 형태**로 제공되며, 사용자는 텍스트 데이터와 스탯을 바탕으로 승자를 결정합니다.
 
-## Expanding the ESLint configuration
+- **셰프 정보 카드:** 요리사의 닉네임(또는 본명), 계급(흑/백), 그리고 핵심 스탯이 텍스트와 그래프로 시각화되어 표시됩니다.
+- **스탯 기반 결정:** 숙련도, 창의력, 멘탈, 미각 등 5가지 스탯을 비교하여 어떤 요리사가 서바이벌에서 유리할지 전략적으로 예측합니다.
+- **서바이벌 매치업:** 라운드마다 1:1 또는 다대다 대결 구도가 카드로 배치되며, 사용자는 진출시키고 싶은 카드를 선택합니다.
+- **라운드 프로그레스:** 100강부터 결승까지, 카드가 필터링되는 과정을 애니메이션(Framer Motion)으로 연출하여 몰입감을 높였습니다.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+---
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## ✨ 주요 기능 (Key Features)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- **랜덤 셰프 생성기:** 게임 시작 시마다 100명의 요리사 이름과 스탯을 새롭게 생성하여 매번 다른 전개를 제공합니다.
+- **80 vs 20 서바이벌:** 80명의 흑수저(닉네임제)와 20명의 백수저(실명제)의 실제 대결 구도를 재현합니다.
+- **토너먼트 로직:** 라운드가 진행될수록 좁혀지는 생존자 명단과 긴장감 넘치는 UI를 제공합니다.
+- **반응형 디자인:** 모바일과 데스크탑 어디서든 즐길 수 있는 미니멀한 UI를 제공합니다.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+---
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 🛠 기술 스택 (Tech Stack)
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+본 프로젝트는 서버리스 환경인 **GitHub Pages** 배포를 목표로, 프론트엔드 중심의 최신 스택으로 구축되었습니다.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- **Core:** `React 18`, `Vite`, `TypeScript`
+- **State Management:** `Zustand` (순수 클라이언트 사이드 상태 관리)
+- **Styling:** `Tailwind CSS`, `shadcn/ui`
+- **Animation:** `Framer Motion` (카드 전환 및 서바이벌 효과)
+- **Deployment:** `GitHub Pages`
+
+---
+
+## 📂 프로젝트 구조 (Project Structure)
+
+```text
+src/
+├── components/      # 공통 UI 컴포넌트 (ChefCard, Header, Arena)
+├── hooks/           # 커스텀 훅 (useGameLogic, useLocalStorage)
+├── store/           # Zustand 상태 관리 (useChefStore)
+├── types/           # TypeScript 타입 정의 (Chef, Round, Stat)
+├── utils/           # 랜덤 생성 로직 및 상수 (naming-generator.ts)
+└── App.tsx          # 메인 게임 루프 및 라운드 핸들링
 ```
