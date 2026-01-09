@@ -7,13 +7,6 @@ import { ScrollArea } from "./ui/scroll-area";
 import type { JudgingResult } from "../types/round";
 import type { Chef } from "../types/chef";
 
-interface BatchState {
-  chefs: Chef[];
-  results: JudgingResult[];
-  messages: string[];
-  flipped: boolean;
-}
-
 export const Round1View = () => {
   const {
     currentRound,
@@ -22,13 +15,20 @@ export const Round1View = () => {
     getUserPicks,
     toggleUserPick,
     startRound1Judging,
-    advanceRound1Cooking,
-    advanceRound1Judging,
+
     startRound2,
   } = useChefStore();
 
-  const [batchState, setBatchState] = useState<BatchState | null>(null);
+  const [showResultFor, setShowResultFor] = useState<{
+    startIndex: number;
+    flipped: boolean;
+  } | null>(null);
   const [cookingMessage, setCookingMessage] = useState<string | null>(null);
+
+  // 이전 인덱스를 추적하여 "방금 심사된 배치"를 감지
+  const prevJudgingIndex = useRef(currentRound?.currentJudgingIndex || 0);
+  const prevMessageLength = useRef(currentRound?.messageLog.length || 0);
+
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 자동 스크롤
@@ -38,49 +38,71 @@ export const Round1View = () => {
     }
   }, [currentRound?.messageLog]);
 
-  // 요리 진행 (좀 더 자:주 호출)
+  // 메시지 로그 감지하여 쿠킹 메시지 표시
   useEffect(() => {
-    if (currentRound?.status === "judging") {
-      const timer = setInterval(() => {
-        const result = advanceRound1Cooking();
-        if (result && result.messages.length > 0) {
-          setCookingMessage(result.messages[result.messages.length - 1]);
-          setTimeout(() => setCookingMessage(null), 2000);
-        }
-      }, 1000); // 1초마다 요리 완료 체크
-      return () => clearInterval(timer);
-    }
-  }, [currentRound?.status, advanceRound1Cooking]);
-
-  // 채점 진행 (기존 로직 유지)
-  useEffect(() => {
-    if (currentRound?.status === "judging" && !batchState) {
-      // 채점 큐에 사람이 충분히 있거나, 요리가 다 끝났는데 사람이 있으면 진행
-      const canAdvance =
-        currentRound.judgingQueue.length > currentRound.currentJudgingIndex ||
-        (currentRound.cookingChefIds.length === 0 &&
-          currentRound.judgingQueue.length > currentRound.currentJudgingIndex);
-
-      if (canAdvance) {
-        const result = advanceRound1Judging();
-        if (result) {
-          setBatchState({ ...result, flipped: false });
-          setTimeout(() => {
-            setBatchState((prev) => (prev ? { ...prev, flipped: true } : null));
-          }, 500);
-          setTimeout(() => {
-            setBatchState(null);
-          }, 2000);
-        }
+    if (!currentRound) return;
+    const currentLength = currentRound.messageLog.length;
+    if (currentLength > prevMessageLength.current) {
+      const lastMsg = currentRound.messageLog[currentLength - 1];
+      if (lastMsg.includes("요리 완료")) {
+        setCookingMessage(lastMsg);
+        setTimeout(() => setCookingMessage(null), 2000);
       }
     }
-  }, [
-    currentRound?.status,
-    batchState,
-    currentRound?.judgingQueue.length,
-    currentRound?.currentJudgingIndex,
-    advanceRound1Judging,
-  ]);
+    prevMessageLength.current = currentLength;
+  }, [currentRound?.messageLog]);
+
+  // 심사 진행 감지 및 UI 업데이트
+  useEffect(() => {
+    if (!currentRound) return;
+    const currentIndex = currentRound.currentJudgingIndex;
+    const prevIndex = prevJudgingIndex.current;
+
+    if (currentIndex > prevIndex) {
+      // 인덱스가 증가했다 = 심사가 진행되었다.
+      // 직전 배치의 결과를 보여주기 위해 상태 설정
+      // 이전 배치의 시작 인덱스는 prevIndex
+      setShowResultFor({ startIndex: prevIndex, flipped: false });
+
+      // 잠시 후 뒤집기 (결과 공개)
+      const flipTimer = setTimeout(() => {
+        setShowResultFor({ startIndex: prevIndex, flipped: true });
+      }, 500);
+
+      // 충분히 보여준 후 현재 대기 상태로 복귀
+      const resetTimer = setTimeout(() => {
+        setShowResultFor(null);
+      }, 2500); // 2.5초 동안 결과 보여줌
+
+      prevJudgingIndex.current = currentIndex;
+
+      return () => {
+        clearTimeout(flipTimer);
+        clearTimeout(resetTimer);
+      };
+    } else {
+      // 인덱스가 같거나 줄어듦 (리셋 등)
+      prevJudgingIndex.current = currentIndex;
+    }
+  }, [currentRound?.currentJudgingIndex, currentRound]);
+
+  // 화면에 보여줄 쉐프들 계산
+  // showResultFor가 있으면 그 배치를, 없으면 현재 대기중인 배치를 보여줌
+  const displayStartIndex = showResultFor
+    ? showResultFor.startIndex
+    : currentRound?.currentJudgingIndex || 0;
+
+  const displayChefsLength = 4;
+  const displayChefsIds = currentRound?.judgingQueue.slice(
+    displayStartIndex,
+    displayStartIndex + displayChefsLength
+  );
+
+  const displayChefs = displayChefsIds
+    ? displayChefsIds
+        .map((id) => chefs.find((c) => c.id === id))
+        .filter((c): c is Chef => c !== undefined)
+    : [];
 
   if (!currentRound) {
     return (
@@ -120,7 +142,7 @@ export const Round1View = () => {
           onClick={() => startRound1Judging()}
           disabled={userPicks.length !== currentRound.userPickLimit}
         >
-          채점 시작
+          심사 시작
         </Button>
 
         <div className="grid grid-cols-5 gap-4 mt-6 max-w-6xl">
@@ -138,7 +160,7 @@ export const Round1View = () => {
     );
   }
 
-  // 2. 채점 단계 (judging)
+  // 2. 심사 단계 (judging)
   if (currentRound.status === "judging") {
     const cookingChefs = currentRound.cookingChefIds
       .map((id) => chefs.find((c) => c.id === id))
@@ -228,18 +250,83 @@ export const Round1View = () => {
             </div>
 
             <div className="grid grid-cols-4 gap-4 w-full max-w-4xl">
-              {batchState ? (
-                batchState.chefs.map((chef, idx) => (
-                  <div key={chef.id} className="w-full">
-                    <ChefCard
-                      chef={chef}
-                      isFlipped={batchState.flipped}
-                      judgingResult={
-                        batchState.flipped ? batchState.results[idx] : undefined
-                      }
-                    />
-                  </div>
-                ))
+              {displayChefs.length > 0 ? (
+                // 4개 슬롯 고정 (채워지는 대로)
+                [...Array(4)].map((_, idx) => {
+                  const chef = displayChefs[idx];
+                  if (!chef) {
+                    return (
+                      <div
+                        key={`empty-${idx}`}
+                        className="aspect-[3/4] bg-gray-800/30 rounded-xl border border-gray-700/50 flex items-center justify-center"
+                      >
+                        <span className="text-4xl opacity-20">⚖️</span>
+                      </div>
+                    );
+                  }
+
+                  // 결과 계산
+                  // showResultFor 상태라면 그것에 따름 (flipped 여부)
+                  // 아니라면 대기 상태 (뒷면 or 앞면?)
+                  // 심사 전 대기 상태: 앞면(프로필) -> 심사 -> 뒷면(결과) 연출?
+                  // 기존 ChefCard: isFlipped=true면 뒷면(결과) 보여줌?
+                  // 확인: ChefCard 구현을 안 봤음. 보통 isFlipped가 true면 뒷면이라고 가정.
+
+                  // 로직:
+                  // 1. showResultFor가 null이다 -> 현재 대기중인 애들 -> 아직 심사 안함 -> 프로필(앞면) 보여줌. (isFlipped = false)
+                  // 2. showResultFor가 있다 -> 방금 심사 끝난 애들.
+                  //    - flipped = false -> 아직 결과 공개 전 (긴장감) -> 뒷면? 앞면?
+                  //      기존 로직: flipped=false(초기) -> true(공개).
+                  //      보통 카드 뒤집기 연출은: 앞면(프로필) -> 뒷면(결과).
+                  //      여기서 `isFlipped` prop의 의미가 중요함.
+                  //      (가정: isFlipped=true여야 결과(뒷면)가 보임)
+
+                  //      T0(심사직후): flipped=false. 즉 아직 결과 안 보여줌. (앞면 유지 or 뒷면으로 돌려서 대기?)
+                  //      T1(500ms): flipped=true. 결과 보여줌.
+
+                  const isResultView = showResultFor !== null;
+                  const showResult = isResultView
+                    ? showResultFor.flipped
+                    : false;
+
+                  // Chef 객체 상태에 따른 결과 매핑
+                  let resultType: "pass" | "fail" | "pending" | undefined =
+                    undefined;
+
+                  if (
+                    chef.status === "alive" ||
+                    currentRound.passedChefIds.includes(chef.id)
+                  )
+                    resultType = "pass";
+                  else if (chef.status === "eliminated") resultType = "fail";
+                  else if (chef.status === "pending") resultType = "pending";
+
+                  // 아직 심사 전인 애들(현재 대기열)은 resultType이 undefined여야 함?
+                  // 하지만 chef.status는 이전 라운드 살아남은 상태인 'alive'일 수 있음.
+                  // 따라서, '현재 라운드에서 통과했냐'를 봐야 함.
+                  const isPassed = currentRound.passedChefIds.includes(chef.id);
+                  const isEliminated = currentRound.eliminatedChefIds.includes(
+                    chef.id
+                  );
+                  const isPending = currentRound.pendingChefIds.includes(
+                    chef.id
+                  );
+
+                  if (isPassed) resultType = "pass";
+                  else if (isEliminated) resultType = "fail";
+                  else if (isPending) resultType = "pending";
+                  else resultType = undefined; // 아직 심사 전
+
+                  return (
+                    <div key={chef.id} className="w-full">
+                      <ChefCard
+                        chef={chef}
+                        isFlipped={showResult}
+                        judgingResult={resultType}
+                      />
+                    </div>
+                  );
+                })
               ) : (
                 <>
                   {[...Array(4)].map((_, i) => (
@@ -309,6 +396,10 @@ export const Round1View = () => {
         <h2 className="text-3xl font-bold">
           Round {currentRound.roundNumber} 완료!
         </h2>
+        <p className="text-red-400 font-bold animate-pulse">
+          ⚠️ 생존자 {passedChefs.length}명을 제외한 전원(
+          {eliminatedChefs.length}명)이 탈락 처리되었습니다.
+        </p>
 
         <Button
           size="lg"

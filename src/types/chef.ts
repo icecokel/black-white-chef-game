@@ -16,6 +16,7 @@ export interface Chef {
   nickname: string; // 별명 (랜덤 생성)
   rank: ChefRank;
   stats: ChefStats;
+  revealedStats: (keyof ChefStats)[]; // 공개된 스탯 목록
   cuisine: CuisineType;
   specialty: string;
   image?: string;

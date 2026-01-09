@@ -27,6 +27,21 @@ export const ChefGrid = ({ enablePick = false }: ChefGridProps) => {
         {sortedChefs.map((chef, index) => {
           const delay = index * 0.02;
 
+          // 결과 매핑
+          let resultType: "pass" | "fail" | "pending" | undefined = undefined;
+
+          if (currentRound && currentRound.roundNumber === 1) {
+            const isPassed = currentRound.passedChefIds.includes(chef.id);
+            const isEliminated = currentRound.eliminatedChefIds.includes(
+              chef.id
+            );
+            const isPending = currentRound.pendingChefIds.includes(chef.id);
+
+            if (isPassed) resultType = "pass";
+            else if (isEliminated) resultType = "fail";
+            else if (isPending) resultType = "pending";
+          }
+
           return (
             <motion.div
               key={chef.id}
@@ -38,6 +53,8 @@ export const ChefGrid = ({ enablePick = false }: ChefGridProps) => {
               <div className="w-full">
                 <ChefCard
                   chef={chef}
+                  isFlipped={true} // 목록에서는 항상 얼굴 공개
+                  judgingResult={resultType}
                   onClick={() => handleCardClick(chef.id)}
                 />
               </div>

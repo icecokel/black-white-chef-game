@@ -10,7 +10,7 @@ import { generateAllChefs } from "../utils/chef-generator";
 import { generateDish, MAIN_INGREDIENTS } from "../utils/dish-generator";
 import { judgeChef, sortChefList } from "../utils/round-logic";
 
-const JUDGING_BATCH_SIZE = 4; // 4명씩 채점
+const JUDGING_BATCH_SIZE = 4; // 4명씩 심사
 const COOKING_BATCH_SIZE = 4; // 4명씩 요리 완료
 
 interface JudgingBatchResult {
@@ -146,16 +146,26 @@ export const useChefStore = create<ChefStore>((set, get) => ({
     // 속도 기반 요리 순서로 cookingChefIds 설정
     const cookingOrder = createSpeedWeightedOrder(aliveBlackChefs);
 
+    // 즉시 요리 완료 (첫 배치를 바로 심사 대기열로 이동하여 대기 시간 제거)
+    const initialReady = cookingOrder.slice(0, COOKING_BATCH_SIZE);
+    const remainingCooking = cookingOrder.slice(COOKING_BATCH_SIZE);
+
     set((state) => ({
       currentRound: state.currentRound
         ? {
             ...state.currentRound,
             status: "judging",
-            cookingChefIds: cookingOrder,
-            judgingQueue: [],
+            cookingChefIds: remainingCooking,
+            judgingQueue: initialReady, // 첫 배치 즉시 대기
             currentJudgingIndex: 0,
             cycleComplete: false,
-            messageLog: ["🍳 라운드 1 심사 시작!"],
+            messageLog: [
+              "🍳 라운드 1 심사 시작!",
+              ...initialReady.map((id) => {
+                const chef = state.chefs.find((c) => c.id === id);
+                return `🍽️ ${chef?.nickname} 요리 완료!`;
+              }),
+            ],
           }
         : null,
     }));
@@ -204,7 +214,7 @@ export const useChefStore = create<ChefStore>((set, get) => ({
     return { completedChefs, messages };
   },
 
-  // 채점 대기 큐에서 4명씩 채점
+  // 심사 대기 큐에서 4명씩 심사
   advanceRound1Judging: () => {
     const { currentRound, chefs } = get();
     if (!currentRound || currentRound.status !== "judging") return null;
@@ -344,7 +354,7 @@ export const useChefStore = create<ChefStore>((set, get) => ({
       return null;
     }
 
-    // 4명씩 채점
+    // 4명씩 심사
     const batchIds = judgingQueue.slice(
       currentJudgingIndex,
       currentJudgingIndex + JUDGING_BATCH_SIZE
@@ -409,6 +419,7 @@ export const useChefStore = create<ChefStore>((set, get) => ({
       const shouldComplete = updatedPassedIds.length >= targetPassCount;
 
       // 완료 시 미합격 흑수저 전원 탈락 처리
+      const finalEliminatedIds: string[] = [];
       const finalChefs = shouldComplete
         ? updatedChefs.map((c) => {
             if (
@@ -416,6 +427,7 @@ export const useChefStore = create<ChefStore>((set, get) => ({
               c.status !== "eliminated" &&
               !updatedPassedIds.includes(c.id)
             ) {
+              finalEliminatedIds.push(c.id); // Collect IDs for state update
               return {
                 ...c,
                 status: "eliminated" as const,
@@ -426,6 +438,15 @@ export const useChefStore = create<ChefStore>((set, get) => ({
           })
         : updatedChefs;
 
+      // If completing, merge pending/cooking/waiting into eliminated
+      const finalEliminatedChefIds = shouldComplete
+        ? [
+            ...state.currentRound!.eliminatedChefIds,
+            ...newEliminated,
+            ...finalEliminatedIds,
+          ]
+        : [...state.currentRound!.eliminatedChefIds, ...newEliminated];
+
       return {
         chefs: finalChefs,
         currentRound: state.currentRound
@@ -433,14 +454,10 @@ export const useChefStore = create<ChefStore>((set, get) => ({
               ...state.currentRound,
               currentJudgingIndex: currentJudgingIndex + batchIds.length,
               passedChefIds: updatedPassedIds,
-              pendingChefIds: [
-                ...state.currentRound.pendingChefIds,
-                ...newPending,
-              ],
-              eliminatedChefIds: [
-                ...state.currentRound.eliminatedChefIds,
-                ...newEliminated,
-              ],
+              pendingChefIds: shouldComplete
+                ? []
+                : [...state.currentRound.pendingChefIds, ...newPending],
+              eliminatedChefIds: finalEliminatedChefIds,
               status: shouldComplete ? "completed" : state.currentRound.status,
               messageLog: [...state.currentRound.messageLog, ...messages],
             }
@@ -523,7 +540,29 @@ export const useChefStore = create<ChefStore>((set, get) => ({
       ],
     };
 
-    set({ currentRound: newRound });
+    // 생존한 흑수저 쉐프들에게 스탯 1개 추가 공개
+    const updatedChefs = chefs.map((chef) => {
+      if (chef.rank === "BLACK" && chef.status === "alive") {
+        const allStats: (keyof import("../types/chef").ChefStats)[] = [
+          "proficiency",
+          "creativity",
+          "taste",
+          "mental",
+          "speed",
+        ];
+        const unrevealed = allStats.filter(
+          (s) => !chef.revealedStats.includes(s)
+        );
+        if (unrevealed.length > 0) {
+          const nextStat =
+            unrevealed[Math.floor(Math.random() * unrevealed.length)];
+          return { ...chef, revealedStats: [...chef.revealedStats, nextStat] };
+        }
+      }
+      return chef;
+    });
+
+    set({ chefs: updatedChefs, currentRound: newRound });
   },
 
   judgeMatch: (matchId: string) => {
@@ -624,12 +663,17 @@ export const useChefStore = create<ChefStore>((set, get) => ({
           : []),
       ];
 
+      const allMatchesCompleted = updatedMatches.every(
+        (m) => m.status === "completed"
+      );
+
       return {
         currentRound: {
           ...state.currentRound,
           matches: updatedMatches,
           passedChefIds: updatedPassedIds,
           eliminatedChefIds: updatedEliminatedIds,
+          status: allMatchesCompleted ? "completed" : state.currentRound.status,
         },
       };
     });
@@ -675,7 +719,30 @@ export const useChefStore = create<ChefStore>((set, get) => ({
       ],
     };
 
-    set({ currentRound: newRound });
+    // 생존한 흑수저 쉐프들에게 스탯 1개 추가 공개
+    const { chefs: currentChefs } = get();
+    const updatedChefs = currentChefs.map((chef) => {
+      if (chef.rank === "BLACK" && chef.status === "alive") {
+        const allStats: (keyof import("../types/chef").ChefStats)[] = [
+          "proficiency",
+          "creativity",
+          "taste",
+          "mental",
+          "speed",
+        ];
+        const unrevealed = allStats.filter(
+          (s) => !chef.revealedStats.includes(s)
+        );
+        if (unrevealed.length > 0) {
+          const nextStat =
+            unrevealed[Math.floor(Math.random() * unrevealed.length)];
+          return { ...chef, revealedStats: [...chef.revealedStats, nextStat] };
+        }
+      }
+      return chef;
+    });
+
+    set({ chefs: updatedChefs, currentRound: newRound });
   },
 
   setRound3Prediction: (prediction: "BLACK" | "WHITE") => {

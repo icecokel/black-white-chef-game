@@ -5,7 +5,8 @@ import { ChefCard } from "./ChefCard";
 import type { Dish } from "../types/match";
 
 export const Round2View = () => {
-  const { currentRound, chefs, startRound2, judgeMatch } = useChefStore();
+  const { currentRound, chefs, startRound2, judgeMatch, startRound3 } =
+    useChefStore();
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [userPrediction, setUserPrediction] = useState<
@@ -32,16 +33,59 @@ export const Round2View = () => {
     );
   }
 
-  const matcheCount = currentRound.matches.length;
-  const match = currentRound.matches[currentMatchIndex];
-
-  if (!match) {
+  if (currentRound.status === "completed") {
     return (
-      <div className="text-white text-center p-10">
-        모든 경기가 종료되었습니다.
+      <div className="flex flex-col items-center gap-6 p-8 h-[calc(100vh-100px)] overflow-y-auto">
+        <h2 className="text-3xl font-bold">Round 2 완료!</h2>
+
+        <Button
+          size="lg"
+          onClick={() => startRound3()}
+          className="bg-white text-black hover:bg-gray-200 font-bold text-lg px-8 py-6 animate-pulse"
+        >
+          ⚔️ 3라운드 시작하기
+        </Button>
+
+        <div className="flex gap-8 text-center bg-gray-900/50 p-6 rounded-xl border border-gray-800">
+          <div>
+            <p className="text-4xl font-bold text-spoon-black-accent">
+              {
+                chefs.filter((c) => c.rank === "BLACK" && c.status === "alive")
+                  .length
+              }
+            </p>
+            <p className="text-muted-foreground">흑수저 생존</p>
+          </div>
+          <div className="text-4xl font-thin opacity-30">|</div>
+          <div>
+            <p className="text-4xl font-bold text-spoon-white-accent">
+              {
+                chefs.filter((c) => c.rank === "WHITE" && c.status === "alive")
+                  .length
+              }
+            </p>
+            <p className="text-muted-foreground">백수저 생존</p>
+          </div>
+        </div>
+
+        <div className="mt-4 w-full max-w-6xl">
+          <h3 className="text-xl font-bold mb-4 text-center">생존자 명단</h3>
+          <div className="grid grid-cols-5 gap-4">
+            {chefs
+              .filter((c) => c.status === "alive")
+              .map((chef) => (
+                <div key={chef.id} className="scale-90">
+                  <ChefCard chef={chef} isFlipped={true} />
+                </div>
+              ))}
+          </div>
+        </div>
       </div>
     );
   }
+
+  const matcheCount = currentRound.matches.length;
+  const match = currentRound.matches[currentMatchIndex];
 
   const blackChef = chefs.find((c) => c.id === match.blackChefId);
   const whiteChef = chefs.find((c) => c.id === match.whiteChefId);

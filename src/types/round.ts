@@ -19,8 +19,8 @@ export interface Round {
   matches?: Match[]; // 2라운드용 매치 정보 (Round 2)
   round3State?: Round3State; // 3라운드용 상태 (Round 3)
   cookingChefIds: string[]; // 요리 중인 쉐프 ID
-  judgingQueue: string[]; // 채점 대기 큐 (요리 완료된 쉐프 ID)
-  currentJudgingIndex: number; // 현재 채점 인덱스
+  judgingQueue: string[]; // 심사 대기 큐 (요리 완료된 쉐프 ID)
+  currentJudgingIndex: number; // 현재 심사 인덱스
   passedChefIds: string[]; // 통과한 쉐프 ID 목록
   pendingChefIds: string[]; // 보류 중인 쉐프 ID 목록
   eliminatedChefIds: string[]; // 탈락한 쉐프 ID 목록

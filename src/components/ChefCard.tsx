@@ -19,7 +19,6 @@ export interface ChefCardProps {
 export const ChefCard = ({
   chef,
   isFlipped = false,
-  revealedStat,
   judgingResult,
   onClick,
   className,
@@ -78,23 +77,28 @@ export const ChefCard = ({
             transform: "rotateY(180deg)",
           }}
         >
-          {/* 판정 결과 오버레이 */}
+          {/* 판정 결과 오버레이 - 기존 디자인 + 가독성 개선 (Stamp Style) */}
           {judgingResult && (
-            <div
-              className={cn(
-                "absolute inset-0 z-40 flex items-center justify-center",
-                judgingResult === "pass" && "bg-green-500/40",
-                judgingResult === "pending" && "bg-yellow-500/40",
-                judgingResult === "fail" && "bg-red-500/40"
-              )}
-            >
-              <span className="text-3xl font-bold text-white">
-                {judgingResult === "pass"
-                  ? "통과!"
-                  : judgingResult === "pending"
-                  ? "보류"
-                  : "탈락"}
-              </span>
+            <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none">
+              <div
+                className={cn(
+                  "border-4 rounded-lg px-4 py-2 transform -rotate-12 backdrop-blur-[2px] shadow-2xl",
+                  judgingResult === "pass" &&
+                    "border-green-500 bg-green-500/20 text-green-400",
+                  judgingResult === "pending" &&
+                    "border-yellow-500 bg-yellow-500/20 text-yellow-500",
+                  judgingResult === "fail" &&
+                    "border-red-500 bg-red-500/20 text-red-500"
+                )}
+              >
+                <span className="text-4xl font-black uppercase tracking-widest drop-shadow-md">
+                  {judgingResult === "pass"
+                    ? "PASS"
+                    : judgingResult === "pending"
+                    ? "HOLD"
+                    : "FAIL"}
+                </span>
+              </div>
             </div>
           )}
 
@@ -194,73 +198,75 @@ export const ChefCard = ({
                     label="맛"
                     value={chef.stats.taste}
                     isBlack={isBlack}
-                    mask={maskStats}
+                    mask={maskStats || !chef.revealedStats?.includes("taste")}
                   />
                   <StatMinimal
                     label="창의"
                     value={chef.stats.creativity}
                     isBlack={isBlack}
-                    mask={maskStats}
+                    mask={
+                      maskStats || !chef.revealedStats?.includes("creativity")
+                    }
                   />
                   <StatMinimal
                     label="숙련"
                     value={chef.stats.proficiency}
                     isBlack={isBlack}
-                    mask={maskStats}
+                    mask={
+                      maskStats || !chef.revealedStats?.includes("proficiency")
+                    }
                   />
                   <StatMinimal
                     label="멘탈"
                     value={chef.stats.mental}
                     isBlack={isBlack}
-                    mask={maskStats}
+                    mask={maskStats || !chef.revealedStats?.includes("mental")}
                   />
                   <StatMinimal
                     label="속도"
                     value={chef.stats.speed}
                     isBlack={isBlack}
-                    mask={maskStats}
+                    mask={maskStats || !chef.revealedStats?.includes("speed")}
                   />
                 </div>
-              ) : // Vertical Layout (Legacy logic)
-              !isBlack ? (
+              ) : (
+                /* Vertical Layout: Always show full stats */
                 <>
                   <StatRow
                     label="맛"
                     value={chef.stats.taste}
                     isBlack={isBlack}
+                    mask={maskStats || !chef.revealedStats?.includes("taste")}
                   />
                   <StatRow
                     label="창의력"
                     value={chef.stats.creativity}
                     isBlack={isBlack}
+                    mask={
+                      maskStats || !chef.revealedStats?.includes("creativity")
+                    }
                   />
                   <StatRow
                     label="숙련도"
                     value={chef.stats.proficiency}
                     isBlack={isBlack}
+                    mask={
+                      maskStats || !chef.revealedStats?.includes("proficiency")
+                    }
                   />
                   <StatRow
                     label="멘탈"
                     value={chef.stats.mental}
                     isBlack={isBlack}
+                    mask={maskStats || !chef.revealedStats?.includes("mental")}
                   />
                   <StatRow
                     label="속도"
                     value={chef.stats.speed}
                     isBlack={isBlack}
+                    mask={maskStats || !chef.revealedStats?.includes("speed")}
                   />
                 </>
-              ) : (
-                <div className="pt-2 border-t border-spoon-black-border/30 opacity-70 text-xs text-center font-mono">
-                  {revealedStat ? (
-                    <div className="flex justify-center items-center gap-2 text-amber-500 font-bold">
-                      <span>🔓 {revealedStat.toUpperCase()}:</span>
-                      <span>{chef.stats[revealedStat]}</span>
-                    </div>
-                  ) : (
-                    "비공개 쉐프"
-                  )}
-                </div>
               )}
             </div>
           </div>
@@ -274,10 +280,12 @@ const StatRow = ({
   label,
   value,
   isBlack,
+  mask,
 }: {
   label: string;
   value: number;
   isBlack: boolean;
+  mask?: boolean;
 }) => (
   <div className="flex justify-between items-center text-xs opacity-80">
     <span
@@ -288,10 +296,11 @@ const StatRow = ({
     <span
       className={cn(
         "font-mono font-medium",
-        isBlack ? "text-spoon-black-accent" : "text-spoon-white-accent"
+        isBlack ? "text-spoon-black-accent" : "text-spoon-white-accent",
+        mask && "opacity-30 text-gray-500" // 가려진 스탯은 어둡게 처리
       )}
     >
-      {value}
+      {mask ? "??" : value}
     </span>
   </div>
 );
@@ -305,7 +314,7 @@ const StatMinimal = ({
   label: string;
   value: number;
   isBlack: boolean;
-  mask: boolean;
+  mask?: boolean;
 }) => (
   <div className="flex justify-between items-center opacity-80">
     <span
@@ -319,7 +328,8 @@ const StatMinimal = ({
     <span
       className={cn(
         "font-mono font-bold",
-        isBlack ? "text-spoon-black-accent" : "text-spoon-white-accent"
+        isBlack ? "text-spoon-black-accent" : "text-spoon-white-accent",
+        mask && "opacity-30 text-gray-500" // 가려진 스탯은 어둡게 처리
       )}
     >
       {mask ? "??" : value}
