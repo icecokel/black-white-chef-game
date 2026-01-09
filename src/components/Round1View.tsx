@@ -15,6 +15,7 @@ export const Round1View = () => {
     getUserPicks,
     toggleUserPick,
     startRound1Judging,
+    autoPickBlackChefs,
 
     startRound2,
   } = useChefStore();
@@ -44,7 +45,7 @@ export const Round1View = () => {
     const currentLength = currentRound.messageLog.length;
     if (currentLength > prevMessageLength.current) {
       const lastMsg = currentRound.messageLog[currentLength - 1];
-      if (lastMsg.includes("요리 완료")) {
+      if (lastMsg.includes("요리 완료") || lastMsg.includes("모든 쉐프")) {
         setCookingMessage(lastMsg);
         setTimeout(() => setCookingMessage(null), 2000);
       }
@@ -137,13 +138,23 @@ export const Round1View = () => {
           </div>
         </div>
 
-        <Button
-          size="lg"
-          onClick={() => startRound1Judging()}
-          disabled={userPicks.length !== currentRound.userPickLimit}
-        >
-          심사 시작
-        </Button>
+        <div className="flex gap-4">
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => autoPickBlackChefs()}
+            disabled={userPicks.length >= currentRound.userPickLimit}
+          >
+            🎲 자동 선택
+          </Button>
+          <Button
+            size="lg"
+            onClick={() => startRound1Judging()}
+            disabled={userPicks.length !== currentRound.userPickLimit}
+          >
+            심사 시작
+          </Button>
+        </div>
 
         <div className="grid grid-cols-5 gap-4 mt-6 max-w-6xl">
           {aliveBlacks.map((chef) => (
@@ -223,22 +234,31 @@ export const Round1View = () => {
             </h3>
             <ScrollArea className="flex-1">
               <div className="space-y-2 pr-4">
-                {cookingChefs.map((chef) => (
-                  <div
-                    key={chef.id}
-                    className="p-3 bg-gray-800/50 rounded-lg flex items-center gap-3 animate-pulse"
-                  >
-                    <div className="text-2xl">🍳</div>
-                    <div>
-                      <div className="font-medium text-sm text-spoon-black-text">
-                        {chef.nickname}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Speed: {chef.stats.speed}
+                {cookingChefs.length > 0 ? (
+                  cookingChefs.map((chef) => (
+                    <div
+                      key={chef.id}
+                      className="p-3 bg-gray-800/50 rounded-lg flex items-center gap-3 animate-pulse"
+                    >
+                      <div className="text-2xl">🍳</div>
+                      <div>
+                        <div className="font-medium text-sm text-spoon-black-text">
+                          {chef.nickname}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Speed: {chef.stats.speed}
+                        </div>
                       </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="p-4 text-center text-muted-foreground bg-gray-800/30 rounded-lg border border-gray-700/30">
+                    <p className="text-green-500 font-bold mb-1">
+                      ✨ 요리 완료!
+                    </p>
+                    <p className="text-xs">모든 쉐프가 요리를 마쳤습니다.</p>
                   </div>
-                ))}
+                )}
               </div>
             </ScrollArea>
           </div>

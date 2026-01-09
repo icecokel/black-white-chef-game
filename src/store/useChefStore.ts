@@ -44,6 +44,7 @@ interface ChefStore {
   playRound3Match: () => void;
   setRound3Prediction: (prediction: "BLACK" | "WHITE") => void;
   isRoundComplete: () => boolean;
+  autoPickBlackChefs: () => void;
 }
 
 // 속도 기반 완료 순서 (높을수록 먼저 완료)
@@ -138,6 +139,31 @@ export const useChefStore = create<ChefStore>((set, get) => ({
     return currentPicks.length < currentRound.userPickLimit;
   },
 
+  autoPickBlackChefs: () => {
+    const { currentRound, chefs } = get();
+    if (!currentRound || currentRound.status !== "picking") return;
+
+    const currentPicks = chefs.filter((c) => c.isPlayerPick);
+    const needToPick = currentRound.userPickLimit - currentPicks.length;
+
+    if (needToPick <= 0) return;
+
+    const availableChefs = chefs.filter(
+      (c) => c.rank === "BLACK" && c.status === "alive" && !c.isPlayerPick
+    );
+
+    // Random shuffle
+    const shuffled = [...availableChefs].sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, needToPick);
+    const selectedIds = selected.map((c) => c.id);
+
+    set((state) => ({
+      chefs: state.chefs.map((c) =>
+        selectedIds.includes(c.id) ? { ...c, isPlayerPick: true } : c
+      ),
+    }));
+  },
+
   startRound1Judging: () => {
     const { currentRound } = get();
     if (!currentRound || currentRound.status !== "picking") return;
@@ -161,6 +187,7 @@ export const useChefStore = create<ChefStore>((set, get) => ({
             cycleComplete: false,
             messageLog: [
               "🍳 라운드 1 심사 시작!",
+              `🔥 ${aliveBlackChefs.length}명의 흑수저 쉐프가 동시에 요리를 시작합니다!`,
               ...initialReady.map((id) => {
                 const chef = state.chefs.find((c) => c.id === id);
                 return `🍽️ ${chef?.nickname} 요리 완료!`;
@@ -199,6 +226,10 @@ export const useChefStore = create<ChefStore>((set, get) => ({
     const messages = completedChefs.map(
       (chef) => `🍽️ ${chef.nickname} 요리 완료!`
     );
+
+    if (remainingCooking.length === 0) {
+      messages.push("✨ 모든 쉐프의 요리가 완료되었습니다!");
+    }
 
     set((state) => ({
       currentRound: state.currentRound
@@ -650,24 +681,40 @@ export const useChefStore = create<ChefStore>((set, get) => ({
         status: "completed",
       };
 
+      const loserId = winnerId
+        ? winnerId === match.blackChefId
+          ? match.whiteChefId
+          : match.blackChefId
+        : undefined;
+
       const updatedPassedIds = [
         ...state.currentRound.passedChefIds,
         ...(winnerId ? [winnerId] : []),
       ];
       const updatedEliminatedIds = [
         ...state.currentRound.eliminatedChefIds,
-        ...(winnerId
-          ? winnerId === match.blackChefId
-            ? [match.whiteChefId]
-            : [match.blackChefId]
-          : []),
+        ...(loserId ? [loserId] : []),
       ];
 
       const allMatchesCompleted = updatedMatches.every(
         (m) => m.status === "completed"
       );
 
+      // 패자 쉐프 상태 업데이트
+      const updatedChefs = loserId
+        ? state.chefs.map((c) =>
+            c.id === loserId
+              ? {
+                  ...c,
+                  status: "eliminated" as const,
+                  eliminatedRound: state.currentRound!.roundNumber,
+                }
+              : c
+          )
+        : state.chefs;
+
       return {
+        chefs: updatedChefs,
         currentRound: {
           ...state.currentRound,
           matches: updatedMatches,
