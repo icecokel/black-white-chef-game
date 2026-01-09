@@ -17,6 +17,8 @@ const SAMPLE_BLACK_SPOON: Chef = {
     mental: 85,
     speed: 90,
   },
+  cuisine: "FUSION",
+  specialty: "알리오 올리오",
 };
 
 const SAMPLE_WHITE_SPOON: Chef = {
@@ -30,6 +32,8 @@ const SAMPLE_WHITE_SPOON: Chef = {
     mental: 98,
     speed: 88,
   },
+  cuisine: "WESTERN",
+  specialty: "켄터키 프라이드 치킨",
 };
 
 function App() {

@@ -13,6 +13,15 @@ export interface Chef {
   name: string; // Black: Nickname, White: Real name
   rank: ChefRank;
   stats: ChefStats;
+  cuisine: CuisineType;
+  specialty: string;
   image?: string;
   bio?: string;
 }
+
+export type CuisineType =
+  | "KOREAN"
+  | "CHINESE"
+  | "JAPANESE"
+  | "WESTERN"
+  | "FUSION";
