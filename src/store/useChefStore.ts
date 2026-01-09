@@ -1,43 +1,56 @@
 import { create } from "zustand";
 import type { Chef, ChefRank } from "../types/chef";
-import type { Round } from "../types/round";
+import type { Round, JudgingResult } from "../types/round";
 import {
   ROUND_1_TARGET_PASS_COUNT,
   ROUND_1_USER_PICK_LIMIT,
 } from "../types/round";
 import { generateAllChefs } from "../utils/chef-generator";
-import {
-  createSpeedWeightedQueue,
-  judgeChef,
-  sortChefList,
-} from "../utils/round-logic";
+import { judgeChef, sortChefList } from "../utils/round-logic";
+
+const JUDGING_BATCH_SIZE = 4; // 4명씩 채점
+const COOKING_BATCH_SIZE = 4; // 4명씩 요리 완료
+
+interface JudgingBatchResult {
+  chefs: Chef[];
+  results: JudgingResult[];
+  messages: string[];
+}
+
+interface CookingResult {
+  completedChefs: Chef[];
+  messages: string[];
+}
 
 interface ChefStore {
   chefs: Chef[];
   currentRound: Round | null;
 
-  // 게임 초기화 (+ 라운드 시작)
   initializeGame: () => void;
-
-  // 쉐프 조회
   getChefsByRank: (rank: ChefRank) => Chef[];
   getSortedChefs: () => Chef[];
   getAliveBlackChefs: () => Chef[];
   getUserPicks: () => Chef[];
-
-  // 유저 픽
   toggleUserPick: (chefId: string) => boolean;
   canPickMore: () => boolean;
-
-  // 라운드 관리
-  startJudging: () => void;
-  advanceJudging: () => {
-    chef: Chef;
-    passed: boolean;
-    message: string;
-  } | null;
+  startRound1Judging: () => void;
+  advanceRound1Cooking: () => CookingResult | null;
+  advanceRound1Judging: () => JudgingBatchResult | null;
   isRoundComplete: () => boolean;
 }
+
+// 속도 기반 완료 순서 (높을수록 먼저 완료)
+const createSpeedWeightedOrder = (chefs: Chef[]): string[] => {
+  return [...chefs]
+    .sort((a, b) => {
+      // 속도(0~100) + 랜덤(0~50)
+      // 랜덤 범위를 늘려(50) 속도가 낮아도 운이 좋으면 먼저 완료될 확률 부여
+      const speedA = a.stats.speed + Math.random() * 50;
+      const speedB = b.stats.speed + Math.random() * 50;
+      return speedB - speedA;
+    })
+    .map((c) => c.id);
+};
 
 export const useChefStore = create<ChefStore>((set, get) => ({
   chefs: [],
@@ -45,17 +58,19 @@ export const useChefStore = create<ChefStore>((set, get) => ({
 
   initializeGame: () => {
     const newChefs = generateAllChefs();
-    // 게임 시작 시 Round 1 자동 시작 (picking 상태)
     const newRound: Round = {
       roundNumber: 1,
       status: "picking",
+      cookingChefIds: [],
       judgingQueue: [],
-      currentJudgingIndex: -1,
-      currentStep: "cooking",
+      currentJudgingIndex: 0,
       passedChefIds: [],
+      pendingChefIds: [],
       eliminatedChefIds: [],
       targetPassCount: ROUND_1_TARGET_PASS_COUNT,
       userPickLimit: ROUND_1_USER_PICK_LIMIT,
+      cycleComplete: false,
+      messageLog: [],
     };
     set({ chefs: newChefs, currentRound: newRound });
   },
@@ -88,7 +103,6 @@ export const useChefStore = create<ChefStore>((set, get) => ({
     const currentPicks = chefs.filter((c) => c.isPlayerPick);
     const isCurrentlyPicked = chef.isPlayerPick;
 
-    // 이미 픽된 경우 해제
     if (isCurrentlyPicked) {
       set((state) => ({
         chefs: state.chefs.map((c) =>
@@ -98,7 +112,6 @@ export const useChefStore = create<ChefStore>((set, get) => ({
       return true;
     }
 
-    // 픽 제한 확인
     if (currentPicks.length >= currentRound.userPickLimit) {
       return false;
     }
@@ -118,81 +131,170 @@ export const useChefStore = create<ChefStore>((set, get) => ({
     return currentPicks.length < currentRound.userPickLimit;
   },
 
-  startJudging: () => {
+  startRound1Judging: () => {
     const { currentRound } = get();
     if (!currentRound || currentRound.status !== "picking") return;
 
     const aliveBlackChefs = get().getAliveBlackChefs();
-    const queue = createSpeedWeightedQueue(aliveBlackChefs);
+    // 속도 기반 요리 순서로 cookingChefIds 설정
+    const cookingOrder = createSpeedWeightedOrder(aliveBlackChefs);
 
     set((state) => ({
       currentRound: state.currentRound
         ? {
             ...state.currentRound,
             status: "judging",
-            judgingQueue: queue,
+            cookingChefIds: cookingOrder,
+            judgingQueue: [],
             currentJudgingIndex: 0,
-            currentStep: "judging",
+            cycleComplete: false,
+            messageLog: ["🍳 라운드 1 심사 시작!"],
           }
         : null,
     }));
   },
 
-  advanceJudging: () => {
+  // 요리 완료 처리 - 4명씩 완료
+  advanceRound1Cooking: () => {
     const { currentRound, chefs } = get();
     if (!currentRound || currentRound.status !== "judging") return null;
 
-    const { judgingQueue, currentJudgingIndex, passedChefIds } = currentRound;
+    const { cookingChefIds, passedChefIds, targetPassCount } = currentRound;
 
-    // 통과 목표 달성 시 종료
-    if (passedChefIds.length >= currentRound.targetPassCount) {
-      set((state) => ({
-        currentRound: state.currentRound
-          ? { ...state.currentRound, status: "completed" }
-          : null,
-      }));
+    // 이미 목표 달성 시 완료 처리
+    if (passedChefIds.length >= targetPassCount) {
       return null;
     }
 
-    // 큐 끝까지 갔는데 목표 미달 시 재큐잉
-    if (currentJudgingIndex >= judgingQueue.length) {
-      const remaining = chefs.filter(
-        (c) =>
-          c.rank === "BLACK" &&
-          c.status === "alive" &&
-          !passedChefIds.includes(c.id)
-      );
-      if (remaining.length === 0) {
-        set((state) => ({
-          currentRound: state.currentRound
-            ? { ...state.currentRound, status: "completed" }
-            : null,
-        }));
-        return null;
-      }
-      const newQueue = createSpeedWeightedQueue(remaining);
-      set((state) => ({
-        currentRound: state.currentRound
-          ? {
-              ...state.currentRound,
-              judgingQueue: newQueue,
-              currentJudgingIndex: 0,
-            }
-          : null,
-      }));
-      return get().advanceJudging();
+    // 요리 중인 쉐프가 없으면 null
+    if (cookingChefIds.length === 0) {
+      return null;
     }
 
-    const chefId = judgingQueue[currentJudgingIndex];
-    const chef = chefs.find((c) => c.id === chefId);
-    if (!chef) return null;
+    // 4명씩 요리 완료
+    const completedIds = cookingChefIds.slice(0, COOKING_BATCH_SIZE);
+    const remainingCooking = cookingChefIds.slice(COOKING_BATCH_SIZE);
 
-    // 직접 채점 진행
-    const passed = judgeChef(chef);
+    const completedChefs = completedIds
+      .map((id) => chefs.find((c) => c.id === id))
+      .filter((c): c is Chef => c !== undefined);
+
+    const messages = completedChefs.map(
+      (chef) => `🍽️ ${chef.nickname} 요리 완료!`
+    );
+
+    set((state) => ({
+      currentRound: state.currentRound
+        ? {
+            ...state.currentRound,
+            cookingChefIds: remainingCooking,
+            judgingQueue: [...state.currentRound.judgingQueue, ...completedIds],
+            messageLog: [...state.currentRound.messageLog, ...messages],
+          }
+        : null,
+    }));
+
+    return { completedChefs, messages };
+  },
+
+  // 채점 대기 큐에서 4명씩 채점
+  advanceRound1Judging: () => {
+    const { currentRound, chefs } = get();
+    if (!currentRound || currentRound.status !== "judging") return null;
+
+    const {
+      judgingQueue,
+      currentJudgingIndex,
+      passedChefIds,
+      targetPassCount,
+    } = currentRound;
+
+    // 이미 목표 달성 시 모든 미합격자 탈락 처리 후 완료
+    if (passedChefIds.length >= targetPassCount) {
+      set((state) => {
+        const updatedChefs = state.chefs.map((c) => {
+          if (
+            c.rank === "BLACK" &&
+            c.status !== "eliminated" &&
+            !passedChefIds.includes(c.id)
+          ) {
+            return {
+              ...c,
+              status: "eliminated" as const,
+              eliminatedRound: currentRound.roundNumber,
+            };
+          }
+          return c;
+        });
+        return {
+          chefs: updatedChefs,
+          currentRound: state.currentRound
+            ? {
+                ...state.currentRound,
+                status: "completed",
+                messageLog: [
+                  ...state.currentRound.messageLog,
+                  "🏆 라운드 1 완료!",
+                ],
+              }
+            : null,
+        };
+      });
+      return null;
+    }
+
+    // 남은 통과 가능 인원
+    const remainingSlots = targetPassCount - passedChefIds.length;
+
+    // 채점 대기 큐에서 채점할 쉐프가 없으면 null
+    if (currentJudgingIndex >= judgingQueue.length) {
+      return null;
+    }
+
+    // 4명씩 채점
+    const batchIds = judgingQueue.slice(
+      currentJudgingIndex,
+      currentJudgingIndex + JUDGING_BATCH_SIZE
+    );
+    const batch = batchIds
+      .map((id) => chefs.find((c) => c.id === id))
+      .filter((c): c is Chef => c !== undefined);
+
+    if (batch.length === 0) return null;
+
+    // 각 쉐프 판정
+    const rawResults = batch.map((chef) => judgeChef(chef));
+
+    // 통과 수를 남은 슬롯으로 제한
+    let passCount = 0;
+    const results: JudgingResult[] = rawResults.map((result) => {
+      if (result === "pass") {
+        if (passCount < remainingSlots) {
+          passCount++;
+          return "pass";
+        } else {
+          return "pending";
+        }
+      }
+      return result;
+    });
+
+    const messages = batch.map((chef, i) => {
+      const result = results[i];
+      if (result === "pass") return `✅ ${chef.nickname} 통과!`;
+      if (result === "pending") return `⏳ ${chef.nickname} 보류`;
+      return `❌ ${chef.nickname} 탈락`;
+    });
 
     set((state) => {
       const updatedChefs = state.chefs.map((c) => {
-        if (c.id === chefId && !passed) {
+        const idx = batchIds.indexOf(c.id);
+        if (idx === -1) return c;
+
+        const result = results[idx];
+        if (result === "pending") {
+          return { ...c, status: "pending" as const };
+        } else if (result === "fail") {
           return {
             ...c,
             status: "eliminated" as const,
@@ -202,27 +304,61 @@ export const useChefStore = create<ChefStore>((set, get) => ({
         return c;
       });
 
+      const newPassed = batchIds.filter((_, i) => results[i] === "pass");
+      const newPending = batchIds.filter((_, i) => results[i] === "pending");
+      const newEliminated = batchIds.filter((_, i) => results[i] === "fail");
+
+      const updatedPassedIds = [
+        ...state.currentRound!.passedChefIds,
+        ...newPassed,
+      ];
+
+      const shouldComplete = updatedPassedIds.length >= targetPassCount;
+
+      // 완료 시 미합격 흑수저 전원 탈락 처리
+      const finalChefs = shouldComplete
+        ? updatedChefs.map((c) => {
+            if (
+              c.rank === "BLACK" &&
+              c.status !== "eliminated" &&
+              !updatedPassedIds.includes(c.id)
+            ) {
+              return {
+                ...c,
+                status: "eliminated" as const,
+                eliminatedRound: currentRound.roundNumber,
+              };
+            }
+            return c;
+          })
+        : updatedChefs;
+
       return {
-        chefs: updatedChefs,
+        chefs: finalChefs,
         currentRound: state.currentRound
           ? {
               ...state.currentRound,
-              currentJudgingIndex: currentJudgingIndex + 1,
-              passedChefIds: passed
-                ? [...state.currentRound.passedChefIds, chefId]
-                : state.currentRound.passedChefIds,
-              eliminatedChefIds: passed
-                ? state.currentRound.eliminatedChefIds
-                : [...state.currentRound.eliminatedChefIds, chefId],
+              currentJudgingIndex: currentJudgingIndex + batchIds.length,
+              passedChefIds: updatedPassedIds,
+              pendingChefIds: [
+                ...state.currentRound.pendingChefIds,
+                ...newPending,
+              ],
+              eliminatedChefIds: [
+                ...state.currentRound.eliminatedChefIds,
+                ...newEliminated,
+              ],
+              status: shouldComplete ? "completed" : state.currentRound.status,
+              messageLog: [...state.currentRound.messageLog, ...messages],
             }
           : null,
       };
     });
 
     return {
-      chef,
-      passed,
-      message: passed ? `${chef.nickname} 통과!` : `${chef.nickname} 탈락...`,
+      chefs: batch,
+      results,
+      messages,
     };
   },
 

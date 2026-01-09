@@ -2,143 +2,228 @@ import { motion } from "framer-motion";
 import type { Chef } from "@/types/chef";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
+import type { JudgingResult } from "@/types/round";
 
 export interface ChefCardProps {
   chef: Chef;
   isRevealed?: boolean;
+  isFlipped?: boolean;
+  judgingResult?: JudgingResult;
   onClick?: () => void;
   className?: string;
 }
 
 export const ChefCard = ({
   chef,
-  // isRevealed = true, // Temporarily unused, but part of interface
+  isFlipped = false,
+  judgingResult,
   onClick,
   className,
 }: ChefCardProps) => {
   const isBlack = chef.rank === "BLACK";
   const isEliminated = chef.status === "eliminated";
+  const isPending = chef.status === "pending";
   const placeholderImage = "/chef-placeholder.png";
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9, y: 20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      whileHover={isEliminated ? {} : { scale: 1.02, y: -5 }}
-      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+    <div
+      className={cn("perspective-1000 w-full", className)}
       onClick={onClick}
-      className={cn(
-        "relative w-full rounded-xl overflow-hidden cursor-pointer group shadow-xl",
-        isBlack
-          ? "bg-spoon-black-bg border border-spoon-black-border shadow-spoon-black-accent/10"
-          : "bg-spoon-white-bg border border-spoon-white-border shadow-spoon-white-accent/10",
-        isEliminated && "opacity-50 grayscale pointer-events-none",
-        chef.isPlayerPick &&
-          !isEliminated &&
-          "ring-2 ring-yellow-400 ring-offset-2 ring-offset-background",
-        className
-      )}
+      style={{ perspective: "1000px" }}
     >
-      {/* 탈락 라운드 배지 */}
-      {isEliminated && chef.eliminatedRound && (
-        <div className="absolute top-2 right-2 z-30 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-          R{chef.eliminatedRound} 탈락
-        </div>
-      )}
-
-      {/* 플레이어 픽 표시 */}
-      {chef.isPlayerPick && !isEliminated && (
-        <div className="absolute top-2 right-2 z-30 bg-yellow-400 text-black text-xs px-2 py-1 rounded-full font-bold">
-          ⭐ 픽
-        </div>
-      )}
-      {/* Texture / Background Effect */}
-      <div
-        className={cn(
-          "absolute inset-0 opacity-20 pointer-events-none mix-blend-overlay",
-          isBlack
-            ? "bg-[url('/paper-texture.png')] bg-repeat"
-            : "bg-[url('/marble-texture.png')] bg-cover"
-        )}
-      />
-
-      {/* Image Section */}
-      <div className="relative w-full aspect-[4/3] overflow-hidden">
-        <img
-          src={chef.image || placeholderImage}
-          alt={isBlack ? chef.nickname : chef.name}
-          className="w-full h-full object-cover"
-        />
-        {/* Gradient overlay for smooth transition to content */}
+      <motion.div
+        className="relative w-full preserve-3d"
+        initial={false}
+        animate={{ rotateY: isFlipped ? 180 : 0 }}
+        transition={{ duration: 0.6, ease: "easeInOut" }}
+        style={{ transformStyle: "preserve-3d" }}
+      >
+        {/* Front - 카드 뒷면 (플립 전) */}
         <div
           className={cn(
-            "absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent",
-            isBlack ? "from-spoon-black-bg" : "from-spoon-white-bg"
+            "absolute inset-0 w-full rounded-xl overflow-hidden backface-hidden",
+            "bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700",
+            "flex items-center justify-center"
           )}
-        />
-        {/* Badge on image */}
-        <div className="absolute top-3 left-3">
-          <Badge
-            variant={isBlack ? "black" : "white"}
-            className="uppercase tracking-widest text-[10px] px-2 py-1"
-          >
-            {isBlack ? "Black Spoon" : "White Spoon"}
-          </Badge>
-        </div>
-      </div>
-
-      {/* Content Container */}
-      <div className="relative z-10 p-4 flex flex-col gap-2">
-        {/* Name - 흑수저는 별명, 백수저는 실명 표시 */}
-        <h3
-          className={cn(
-            "text-lg font-bold leading-tight break-keep",
-            isBlack
-              ? "text-spoon-black-text font-sans tracking-tight"
-              : "text-spoon-white-text font-serif italic"
-          )}
+          style={{ backfaceVisibility: "hidden" }}
         >
-          {isBlack ? chef.nickname : chef.name}
-        </h3>
+          <div className="text-center">
+            <div className="text-6xl mb-4">🍽️</div>
+            <p className="text-gray-400 text-sm">심사 대기</p>
+          </div>
+        </div>
 
-        {/* Stats - Only for White Spoons */}
-        {!isBlack && (
+        {/* Back - 카드 앞면 (플립 후) */}
+        <motion.div
+          className={cn(
+            "relative w-full rounded-xl overflow-hidden cursor-pointer group shadow-xl",
+            isBlack
+              ? "bg-spoon-black-bg border border-spoon-black-border shadow-spoon-black-accent/10"
+              : "bg-spoon-white-bg border border-spoon-white-border shadow-spoon-white-accent/10",
+            isEliminated && "opacity-50 grayscale",
+            isPending && "ring-2 ring-yellow-500",
+            chef.isPlayerPick &&
+              !isEliminated &&
+              "ring-2 ring-yellow-400 ring-offset-2 ring-offset-background"
+          )}
+          style={{
+            backfaceVisibility: "hidden",
+            transform: "rotateY(180deg)",
+          }}
+        >
+          {/* 판정 결과 오버레이 */}
+          {judgingResult && (
+            <div
+              className={cn(
+                "absolute inset-0 z-40 flex items-center justify-center",
+                judgingResult === "pass" && "bg-green-500/40",
+                judgingResult === "pending" && "bg-yellow-500/40",
+                judgingResult === "fail" && "bg-red-500/40"
+              )}
+            >
+              <span className="text-3xl font-bold text-white">
+                {judgingResult === "pass"
+                  ? "통과!"
+                  : judgingResult === "pending"
+                  ? "보류"
+                  : "탈락"}
+              </span>
+            </div>
+          )}
+
+          {/* 탈락 라운드 배지 */}
+          {isEliminated && chef.eliminatedRound && (
+            <div className="absolute top-2 right-2 z-30 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+              R{chef.eliminatedRound} 탈락
+            </div>
+          )}
+
+          {/* 보류 배지 */}
+          {isPending && !judgingResult && (
+            <div className="absolute top-2 right-2 z-30 bg-yellow-500 text-black text-xs px-2 py-1 rounded-full font-bold">
+              보류
+            </div>
+          )}
+
+          {/* 플레이어 픽 표시 */}
+          {chef.isPlayerPick && !isEliminated && !isPending && (
+            <div className="absolute top-2 right-2 z-30 bg-yellow-400 text-black text-xs px-2 py-1 rounded-full font-bold">
+              ⭐ 픽
+            </div>
+          )}
+
+          {/* Texture */}
           <div
             className={cn(
-              "pt-2 border-t flex flex-col gap-0.5",
-              "border-spoon-white-border/30"
+              "absolute inset-0 opacity-20 pointer-events-none mix-blend-overlay",
+              isBlack
+                ? "bg-[url('/paper-texture.png')] bg-repeat"
+                : "bg-[url('/marble-texture.png')] bg-cover"
             )}
-          >
-            <StatRow label="맛" value={chef.stats.taste} isBlack={isBlack} />
-            <StatRow
-              label="창의력"
-              value={chef.stats.creativity}
-              isBlack={isBlack}
-            />
-            <StatRow
-              label="숙련도"
-              value={chef.stats.proficiency}
-              isBlack={isBlack}
-            />
-            <StatRow label="멘탈" value={chef.stats.mental} isBlack={isBlack} />
-            <StatRow label="속도" value={chef.stats.speed} isBlack={isBlack} />
-          </div>
-        )}
+          />
 
-        {/* Black Spoon Placeholder */}
-        {isBlack && (
-          <div className="pt-2 border-t border-spoon-black-border/30 opacity-50 text-xs text-center font-mono">
-            ???
+          {/* Image Section */}
+          <div className="relative w-full aspect-[4/3] overflow-hidden">
+            <img
+              src={chef.image || placeholderImage}
+              alt={isBlack ? chef.nickname : chef.name}
+              className="w-full h-full object-cover"
+            />
+            <div
+              className={cn(
+                "absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent",
+                isBlack ? "from-spoon-black-bg" : "from-spoon-white-bg"
+              )}
+            />
+            <div className="absolute top-3 left-3">
+              <Badge
+                variant={isBlack ? "black" : "white"}
+                className="uppercase tracking-widest text-[10px] px-2 py-1"
+              >
+                {isBlack ? "Black Spoon" : "White Spoon"}
+              </Badge>
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* Hover Shimmer */}
-      <motion.div
-        className="absolute inset-0 z-20 pointer-events-none bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-shimmer"
-        style={{ skewX: -20 }}
-      />
-    </motion.div>
+          {/* Content */}
+          <div className="relative z-10 p-4 flex flex-col gap-2">
+            <h3
+              className={cn(
+                "text-lg font-bold leading-tight break-keep min-h-[2.75rem]",
+                isBlack
+                  ? "text-spoon-black-text font-sans tracking-tight"
+                  : "text-spoon-white-text font-serif italic"
+              )}
+            >
+              {isBlack ? chef.nickname : chef.name}
+            </h3>
+
+            {!isBlack && (
+              <div
+                className={cn(
+                  "pt-2 border-t flex flex-col gap-0.5",
+                  "border-spoon-white-border/30"
+                )}
+              >
+                <StatRow
+                  label="맛"
+                  value={chef.stats.taste}
+                  isBlack={isBlack}
+                />
+                <StatRow
+                  label="창의력"
+                  value={chef.stats.creativity}
+                  isBlack={isBlack}
+                />
+                <StatRow
+                  label="숙련도"
+                  value={chef.stats.proficiency}
+                  isBlack={isBlack}
+                />
+                <StatRow
+                  label="멘탈"
+                  value={chef.stats.mental}
+                  isBlack={isBlack}
+                />
+                <StatRow
+                  label="속도"
+                  value={chef.stats.speed}
+                  isBlack={isBlack}
+                />
+              </div>
+            )}
+
+            {isBlack && (
+              <div className="pt-2 border-t border-spoon-black-border/30 opacity-70 text-xs text-center font-mono">
+                {(() => {
+                  // ID 기반 해시로 고정된 힌트 결정 (0~5)
+                  const hash = chef.id.split("").reduce((acc, char) => {
+                    return char.charCodeAt(0) + ((acc << 5) - acc);
+                  }, 0);
+                  const hintIndex = Math.abs(hash) % 6;
+
+                  switch (hintIndex) {
+                    case 0:
+                      return `맛: ${chef.stats.taste}`;
+                    case 1:
+                      return `창의력: ${chef.stats.creativity}`;
+                    case 2:
+                      return `숙련도: ${chef.stats.proficiency}`;
+                    case 3:
+                      return `멘탈: ${chef.stats.mental}`;
+                    case 4:
+                      return `속도: ${chef.stats.speed}`;
+                    case 5:
+                    default:
+                      return `장르: ${chef.cuisine}`;
+                  }
+                })()}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </motion.div>
+    </div>
   );
 };
 

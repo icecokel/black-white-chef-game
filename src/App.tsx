@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ChefGrid } from "./components/ChefGrid";
 import { InitialScreen } from "./components/InitialScreen";
 import { GameTabs, type TabType } from "./components/GameTabs";
-import { RoundView } from "./components/RoundView";
+import { Round1View } from "./components/Round1View";
 import { useChefStore } from "./store/useChefStore";
 
 type GameState = "intro" | "playing" | "result";
@@ -53,7 +53,7 @@ function App() {
 
       {/* Content */}
       {activeTab === "round" ? (
-        <RoundView />
+        <Round1View />
       ) : (
         <ChefGrid enablePick={!currentRound} />
       )}

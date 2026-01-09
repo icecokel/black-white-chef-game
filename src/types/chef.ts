@@ -8,7 +8,7 @@ export interface ChefStats {
   speed: number; // 속도 (5th stat)
 }
 
-export type ChefStatus = "alive" | "eliminated";
+export type ChefStatus = "alive" | "pending" | "eliminated";
 
 export interface Chef {
   id: string;
