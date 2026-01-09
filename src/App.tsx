@@ -4,6 +4,7 @@ import { InitialScreen } from "./components/InitialScreen";
 import { GameTabs, type TabType } from "./components/GameTabs";
 import { Round1View } from "./components/Round1View";
 import { Round2View } from "./components/Round2View";
+import { Round3View } from "./components/Round3View";
 import { useChefStore } from "./store/useChefStore";
 
 type GameState = "intro" | "playing" | "result";
@@ -54,7 +55,9 @@ function App() {
 
       {/* Content */}
       {activeTab === "round" ? (
-        currentRound?.roundNumber === 2 ? (
+        currentRound?.roundNumber === 3 ? (
+          <Round3View />
+        ) : currentRound?.roundNumber === 2 ? (
           <Round2View />
         ) : (
           <Round1View />

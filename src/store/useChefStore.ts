@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Chef, ChefRank } from "../types/chef";
-import type { Round, JudgingResult } from "../types/round";
+import type { Round, JudgingResult, Round3State } from "../types/round";
+import { generateJudges, type Judge } from "../types/judge";
 import {
   ROUND_1_TARGET_PASS_COUNT,
   ROUND_1_USER_PICK_LIMIT,
@@ -39,6 +40,9 @@ interface ChefStore {
   advanceRound1Judging: () => JudgingBatchResult | null;
   startRound2: () => void;
   judgeMatch: (matchId: string) => void;
+  startRound3: () => void;
+  playRound3Match: () => void;
+  setRound3Prediction: (prediction: "BLACK" | "WHITE") => void;
   isRoundComplete: () => boolean;
 }
 
@@ -210,6 +214,7 @@ export const useChefStore = create<ChefStore>((set, get) => ({
       currentJudgingIndex,
       passedChefIds,
       targetPassCount,
+      pendingChefIds, // Need to access pending list
     } = currentRound;
 
     // 이미 목표 달성 시 모든 미합격자 탈락 처리 후 완료
@@ -249,8 +254,93 @@ export const useChefStore = create<ChefStore>((set, get) => ({
     // 남은 통과 가능 인원
     const remainingSlots = targetPassCount - passedChefIds.length;
 
-    // 채점 대기 큐에서 채점할 쉐프가 없으면 null
+    // 채점 대기 큐에서 채점할 쉐프가 없으면 -> 보류(Pending) 인원 처리 로직
     if (currentJudgingIndex >= judgingQueue.length) {
+      // 큐는 비었지만 아직 목표 인원을 못 채운 경우
+      if (remainingSlots > 0 && pendingChefIds.length > 0) {
+        // 보류 인원 중 스탯 총합이 높은 순으로 정렬하여 추가 합격
+        const pendingChefs = pendingChefIds
+          .map((id) => chefs.find((c) => c.id === id))
+          .filter((c): c is Chef => c !== undefined)
+          .sort((a, b) => {
+            const sumA = Object.values(a.stats).reduce((acc, v) => acc + v, 0);
+            const sumB = Object.values(b.stats).reduce((acc, v) => acc + v, 0);
+            return sumB - sumA; // Descending
+          });
+
+        const chefsToPass = pendingChefs.slice(0, remainingSlots);
+        const chefsToEliminate = pendingChefs.slice(remainingSlots);
+
+        const newPassedIds = chefsToPass.map((c) => c.id);
+        const newEliminatedIds = chefsToEliminate.map((c) => c.id);
+
+        const passedNames = chefsToPass.map((c) => c.nickname).join(", ");
+        const messages = [`📢 보류자 재심사 결과: ${passedNames} 추가 합격!`];
+
+        set((state) => {
+          const updatedChefs = state.chefs.map((c) => {
+            if (newPassedIds.includes(c.id)) {
+              return { ...c, status: "alive" as const }; // Back to alive/pass
+            }
+            if (newEliminatedIds.includes(c.id)) {
+              return {
+                ...c,
+                status: "eliminated" as const,
+                eliminatedRound: currentRound.roundNumber,
+              };
+            }
+            return c;
+          });
+
+          return {
+            chefs: updatedChefs,
+            currentRound: state.currentRound
+              ? {
+                  ...state.currentRound,
+                  passedChefIds: [
+                    ...state.currentRound.passedChefIds,
+                    ...newPassedIds,
+                  ],
+                  eliminatedChefIds: [
+                    ...state.currentRound.eliminatedChefIds,
+                    ...newEliminatedIds,
+                  ],
+                  pendingChefIds: [], // All pending processed
+                  status: "completed", // Target reached or pending exhausted (round ends either way for now)
+                  messageLog: [
+                    ...state.currentRound.messageLog,
+                    ...messages,
+                    "🏆 라운드 1 완료!",
+                  ],
+                }
+              : null,
+          };
+        });
+
+        return {
+          chefs: pendingChefs,
+          results: pendingChefs.map((c) =>
+            newPassedIds.includes(c.id) ? "pass" : "fail"
+          ),
+          messages,
+        };
+      } else if (remainingSlots > 0 && pendingChefIds.length === 0) {
+        // 보류 인원도 없는데 목표 미달인 경우 (이론상 발생 희박하지만 처리)
+        // 그냥 종료 or 에러 메시지? 현재는 그냥 종료 처리
+        set((state) => ({
+          currentRound: state.currentRound
+            ? {
+                ...state.currentRound,
+                status: "completed",
+                messageLog: [
+                  ...state.currentRound.messageLog,
+                  "⚠️ 합격자 부족으로 라운드 종료",
+                ],
+              }
+            : null,
+        }));
+        return null;
+      }
       return null;
     }
 
@@ -540,6 +630,253 @@ export const useChefStore = create<ChefStore>((set, get) => ({
           matches: updatedMatches,
           passedChefIds: updatedPassedIds,
           eliminatedChefIds: updatedEliminatedIds,
+        },
+      };
+    });
+  },
+
+  startRound3: () => {
+    const { currentRound } = get();
+    if (
+      !currentRound ||
+      currentRound.roundNumber !== 2 ||
+      currentRound.status !== "completed"
+    )
+      return;
+
+    // 100인의 심사위원 생성
+    const judges = generateJudges(100);
+
+    const round3State: Round3State = {
+      matches: [], // 매치는 playRound3Match 호출 시 생성됨 (혹은 미리 생성 가능)
+      currentMatchIndex: 0,
+      judges,
+      blackTeamScore: 0,
+      whiteTeamScore: 0,
+      userPrediction: null,
+    };
+
+    const newRound: Round = {
+      roundNumber: 3,
+      status: "picking", // 예측 단계
+      round3State,
+      cookingChefIds: [],
+      judgingQueue: [],
+      currentJudgingIndex: 0,
+      passedChefIds: [],
+      pendingChefIds: [],
+      eliminatedChefIds: [],
+      targetPassCount: 0,
+      userPickLimit: 0,
+      cycleComplete: false,
+      messageLog: [
+        "⚔️ 라운드 3: 흑백 팀전 (재료의 방) 시작!",
+        "승리할 것으로 예상되는 팀을 선택해주세요.",
+      ],
+    };
+
+    set({ currentRound: newRound });
+  },
+
+  setRound3Prediction: (prediction: "BLACK" | "WHITE") => {
+    set((state) => {
+      if (!state.currentRound || state.currentRound.roundNumber !== 3)
+        return { currentRound: state.currentRound };
+
+      return {
+        currentRound: {
+          ...state.currentRound,
+          round3State: state.currentRound.round3State
+            ? {
+                ...state.currentRound.round3State,
+                userPrediction: prediction,
+              }
+            : undefined,
+        },
+      };
+    });
+  },
+
+  playRound3Match: () => {
+    const { chefs, currentRound } = get();
+    if (
+      !currentRound ||
+      currentRound.roundNumber !== 3 ||
+      !currentRound.round3State
+    )
+      return;
+
+    const { round3State } = currentRound;
+    const matchIndex = round3State.currentMatchIndex;
+
+    // 3판까지만 진행 (0, 1, 2)
+    if (matchIndex > 2) return;
+
+    // 팀 스탯 계산
+    const blackTeam = chefs.filter(
+      (c) => c.rank === "BLACK" && c.status === "alive"
+    );
+    const whiteTeam = chefs.filter(
+      (c) => c.rank === "WHITE" && c.status === "alive"
+    );
+
+    const getAvgStat = (team: Chef[], stat: keyof Chef["stats"]) =>
+      team.reduce((sum, c) => sum + c.stats[stat], 0) / team.length;
+
+    // 임시 팀 쉐프 객체 생성 (요리 생성용)
+    const createTeamChef = (team: Chef[], id: string, name: string): Chef => ({
+      ...team[0],
+      id,
+      name,
+      nickname: name,
+      stats: {
+        taste: getAvgStat(team, "taste"),
+        creativity: getAvgStat(team, "creativity"),
+        proficiency: getAvgStat(team, "proficiency"),
+        mental: getAvgStat(team, "mental"),
+        speed: getAvgStat(team, "speed"),
+      },
+    });
+
+    const blackTeamChef = createTeamChef(blackTeam, "team-black", "흑수저 팀");
+    const whiteTeamChef = createTeamChef(whiteTeam, "team-white", "백수저 팀");
+
+    // 요리 생성
+    const mainIngredient = MAIN_INGREDIENTS[matchIndex]; // 매치별 고정 재료 사용
+    const blackDish = generateDish(blackTeamChef, mainIngredient);
+    const whiteDish = generateDish(whiteTeamChef, mainIngredient);
+
+    // 투표 진행
+    const judges = round3State.judges;
+    let blackVotes = 0;
+    let whiteVotes = 0;
+
+    // 각 심사위원 투표
+    const updatedJudges = judges.map((judge) => {
+      // 심사위원 점수 계산 logic
+      // 선호도 * 요리점수
+      // 맛 40, 창의 30, 완성 30 기본 비중 + 개인 선호도
+      const calcScore = (
+        dish: typeof blackDish,
+        pref: Judge["preferences"]
+      ) => {
+        let score = 0;
+        score += dish.scores.taste * (0.4 + (pref.taste - 50) / 200); // 가중치 변형
+        score += dish.scores.creativity * (0.3 + (pref.creativity - 50) / 200);
+        score +=
+          dish.scores.completeness * (0.3 + (pref.completeness - 50) / 200);
+        return score;
+      };
+
+      const blackScore = calcScore(blackDish, judge.preferences);
+      const whiteScore = calcScore(whiteDish, judge.preferences);
+
+      const pick =
+        blackScore >= whiteScore ? ("BLACK" as const) : ("WHITE" as const);
+      if (pick === "BLACK") blackVotes++;
+      else whiteVotes++;
+
+      return {
+        ...judge,
+        voteHistory: [...judge.voteHistory, { matchIndex, pick }],
+      };
+    });
+
+    // 점수 가중치 (1 -> 2 -> 10)
+    let scoreWeight = 1;
+    if (matchIndex === 1) scoreWeight = 2; // 2차전
+    if (matchIndex === 2) scoreWeight = 10; // 3차전
+
+    // 이번 라운드 획득 점수
+    const roundBlackScore = blackVotes * scoreWeight;
+    const roundWhiteScore = whiteVotes * scoreWeight;
+
+    // 다음 라운드 진출 심사위원 선발 (0, 1 매치 종료 후)
+    let nextJudges = updatedJudges;
+    if (matchIndex < 2) {
+      // 승리팀 투표자 중 50%, 패배팀 투표자 중 50% 선발
+      // 단, 인원이 홀수거나 딱 안 떨어질 수 있으므로 비율 맞춤
+      const nextCount = matchIndex === 0 ? 50 : 10; // 100->50, 50->10
+      const halfCount = nextCount / 2;
+
+      const winnerPick = roundBlackScore >= roundWhiteScore ? "BLACK" : "WHITE";
+
+      const winnerVoters = updatedJudges.filter((j) => {
+        const lastVote = j.voteHistory[j.voteHistory.length - 1];
+        return lastVote.pick === winnerPick;
+      });
+      const loserVoters = updatedJudges.filter((j) => {
+        const lastVote = j.voteHistory[j.voteHistory.length - 1];
+        return lastVote.pick !== winnerPick;
+      });
+
+      // 랜덤 셔플 후 선발
+      const selectedWinnerVoters = winnerVoters
+        .sort(() => Math.random() - 0.5)
+        .slice(0, halfCount);
+      const selectedLoserVoters = loserVoters
+        .sort(() => Math.random() - 0.5)
+        .slice(0, halfCount);
+
+      nextJudges = [...selectedWinnerVoters, ...selectedLoserVoters];
+    }
+
+    set((state) => {
+      if (!state.currentRound || !state.currentRound.round3State)
+        return { currentRound: state.currentRound };
+
+      // 매치 기록 생성
+      const newMatch = {
+        id: `r3-match-${matchIndex}`,
+        blackChefId: "team-black",
+        whiteChefId: "team-white",
+        blackDish,
+        whiteDish,
+        mainIngredient,
+        votes: [], // 상세 100개 투표는 생략하거나 요약만 저장
+        winnerId:
+          roundBlackScore >= roundWhiteScore ? "team-black" : "team-white",
+        isTie: false,
+        status: "completed" as const,
+      };
+
+      const newBlackTeamScore =
+        state.currentRound.round3State.blackTeamScore + roundBlackScore;
+      const newWhiteTeamScore =
+        state.currentRound.round3State.whiteTeamScore + roundWhiteScore;
+
+      const isLastMatch = matchIndex === 2;
+      let messageLog = [...state.currentRound.messageLog];
+
+      messageLog.push(
+        `🥊 매치 ${
+          matchIndex + 1
+        } 종료! (흑: ${blackVotes}표, 백: ${whiteVotes}표)`
+      );
+
+      if (isLastMatch) {
+        const finalWinner =
+          newBlackTeamScore >= newWhiteTeamScore ? "BLACK" : "WHITE";
+        messageLog.push(
+          `🏆 최종 승리: ${
+            finalWinner === "BLACK" ? "흑수저 팀" : "백수저 팀"
+          }!`
+        );
+      }
+
+      return {
+        currentRound: {
+          ...state.currentRound,
+          status: isLastMatch ? "completed" : "cooking", // 다음 매치 대기 (picking -> cooking -> judging 반복 또는 그냥 cooking 상태 유지)
+          messageLog,
+          round3State: {
+            ...state.currentRound.round3State,
+            matches: [...state.currentRound.round3State.matches, newMatch],
+            currentMatchIndex: matchIndex + 1,
+            judges: nextJudges,
+            blackTeamScore: newBlackTeamScore,
+            whiteTeamScore: newWhiteTeamScore,
+          },
         },
       };
     });

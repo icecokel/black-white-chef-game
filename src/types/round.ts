@@ -1,11 +1,23 @@
-export type RoundStatus = "picking" | "cooking" | "judging" | "completed";
 import type { Match } from "./match";
+import type { Judge } from "./judge";
+
+export type RoundStatus = "picking" | "cooking" | "judging" | "completed";
 export type JudgingResult = "pass" | "pending" | "fail";
+
+export interface Round3State {
+  matches: Match[]; // 3번의 매치 (100인, 50인, 10인)
+  currentMatchIndex: number; // 0, 1, 2
+  judges: Judge[]; // 현재 생존한 심사위원
+  blackTeamScore: number;
+  whiteTeamScore: number;
+  userPrediction: "BLACK" | "WHITE" | null;
+}
 
 export interface Round {
   roundNumber: number;
   status: RoundStatus;
-  matches?: Match[]; // 2라운드용 매치 정보
+  matches?: Match[]; // 2라운드용 매치 정보 (Round 2)
+  round3State?: Round3State; // 3라운드용 상태 (Round 3)
   cookingChefIds: string[]; // 요리 중인 쉐프 ID
   judgingQueue: string[]; // 채점 대기 큐 (요리 완료된 쉐프 ID)
   currentJudgingIndex: number; // 현재 채점 인덱스
