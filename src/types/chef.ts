@@ -10,7 +10,8 @@ export interface ChefStats {
 
 export interface Chef {
   id: string;
-  name: string; // Black: Nickname, White: Real name
+  name: string; // 실명 (랜덤 생성)
+  nickname: string; // 별명 (랜덤 생성)
   rank: ChefRank;
   stats: ChefStats;
   cuisine: CuisineType;

@@ -1,8 +1,7 @@
 import type { Chef, ChefRank, ChefStats, CuisineType } from "../types/chef";
 import {
   generateCombinatorialName,
-  generateWhiteSpoonName,
-  WHITE_SPOON_REAL_NAMES,
+  generateRealName,
 } from "./naming-generator";
 
 // 임시 ID 생성을 위한 간단한 유틸리티
@@ -69,10 +68,15 @@ const getRandomElement = <T>(arr: T[]): T => {
   return arr[Math.floor(Math.random() * arr.length)];
 };
 
-export const generateChef = (rank: ChefRank, name: string): Chef => {
+/**
+ * 쉐프를 생성합니다.
+ * 모든 쉐프는 실명(name)과 별명(nickname)을 모두 가집니다.
+ */
+export const generateChef = (rank: ChefRank): Chef => {
   return {
     id: generateId(),
-    name,
+    name: generateRealName(),
+    nickname: generateCombinatorialName(),
     rank,
     stats: generateStats(rank),
     cuisine: getRandomElement(CUISINES),
@@ -82,48 +86,23 @@ export const generateChef = (rank: ChefRank, name: string): Chef => {
 };
 
 /**
- * 100명의 쉐프를 생성합니다. (백수저 20명, 흑수저 80명)
- * 이름 중복을 방지합니다.
+ * 100명의 쉐프를 생성합니다. (흑수저 80명, 백수저 20명)
+ * 순서: 흑수저 -> 백수저 (상단에 흑수저, 하단에 백수저)
  */
 export const generateAllChefs = (): Chef[] => {
-  const chefs: Chef[] = [];
-  const usedNames = new Set<string>();
+  const blackChefs: Chef[] = [];
+  const whiteChefs: Chef[] = [];
 
-  // 백수저 20명 생성 (실명 사용)
-  const shuffledWhiteNames = [...WHITE_SPOON_REAL_NAMES]
-    .sort(() => 0.5 - Math.random())
-    .slice(0, 20);
-
-  shuffledWhiteNames.forEach((name) => {
-    usedNames.add(name);
-    chefs.push(generateChef("WHITE", name));
-  });
-
-  // 백수저 부족분 채우기
-  while (chefs.length < 20) {
-    let name = generateWhiteSpoonName();
-    let attempts = 0;
-    while (usedNames.has(name) && attempts < 10) {
-      name = generateWhiteSpoonName();
-      attempts++;
-    }
-    usedNames.add(name);
-    chefs.push(generateChef("WHITE", name));
+  // 흑수저 80명 생성
+  for (let i = 0; i < 80; i++) {
+    blackChefs.push(generateChef("BLACK"));
   }
 
-  // 흑수저 80명 생성 (조합형 닉네임 사용)
-  // 목표는 총 100명이 될 때까지
-  while (chefs.length < 100) {
-    let name = generateCombinatorialName();
-    let attempts = 0;
-    // 중복 방지 시도
-    while (usedNames.has(name) && attempts < 20) {
-      name = generateCombinatorialName();
-      attempts++;
-    }
-    usedNames.add(name);
-    chefs.push(generateChef("BLACK", name));
+  // 백수저 20명 생성
+  for (let i = 0; i < 20; i++) {
+    whiteChefs.push(generateChef("WHITE"));
   }
 
-  return chefs;
+  // 흑수저 먼저, 백수저 나중에
+  return [...blackChefs, ...whiteChefs];
 };

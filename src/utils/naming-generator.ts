@@ -127,6 +127,101 @@ export const WHITE_SPOON_REAL_NAMES = [
   "토마스 켈러",
 ];
 
+// 한국 성씨
+const LAST_NAMES = [
+  "김",
+  "이",
+  "박",
+  "최",
+  "정",
+  "강",
+  "조",
+  "윤",
+  "장",
+  "임",
+  "한",
+  "오",
+  "서",
+  "신",
+  "권",
+  "황",
+  "안",
+  "송",
+  "류",
+  "전",
+  "홍",
+  "고",
+  "문",
+  "양",
+  "손",
+  "배",
+  "백",
+  "허",
+  "유",
+  "남",
+];
+
+// 한국 이름 (1~2글자)
+const FIRST_NAMES = [
+  "민준",
+  "서연",
+  "도윤",
+  "서현",
+  "시우",
+  "하윤",
+  "주원",
+  "하은",
+  "지호",
+  "윤서",
+  "준서",
+  "민서",
+  "예준",
+  "지민",
+  "서준",
+  "서윤",
+  "지우",
+  "수빈",
+  "지원",
+  "다은",
+  "현우",
+  "예진",
+  "우진",
+  "소율",
+  "승현",
+  "가은",
+  "태민",
+  "나은",
+  "정우",
+  "채원",
+  "지훈",
+  "수아",
+  "준혁",
+  "유진",
+  "동현",
+  "서아",
+  "성민",
+  "예은",
+  "재현",
+  "소민",
+  "민재",
+  "지아",
+  "현준",
+  "은서",
+  "승우",
+  "초아",
+  "시현",
+  "연우",
+];
+
+/**
+ * 한국 실명 스타일로 랜덤 생성합니다.
+ */
+export const generateRealName = (): string => {
+  const lastName = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
+  const firstName = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
+  return `${lastName}${firstName}`;
+};
+
 export const generateCombinatorialName = (): string => {
   const prefix =
     NICKNAME_PREFIXES[Math.floor(Math.random() * NICKNAME_PREFIXES.length)];
