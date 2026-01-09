@@ -7,35 +7,18 @@ import {
 // 임시 ID 생성을 위한 간단한 유틸리티
 const generateId = (): string => Math.random().toString(36).substr(2, 9);
 
+// 확장된 요리 카테고리
 const CUISINES: CuisineType[] = [
   "KOREAN",
   "CHINESE",
   "JAPANESE",
   "WESTERN",
   "FUSION",
-];
-
-const SPECIALTIES = [
-  "비빔밥",
-  "불고기",
-  "김치찌개",
-  "파스타",
-  "스테이크",
-  "초밥",
-  "탕수육",
-  "짬뽕",
-  "마라탕",
-  "타코",
-  "버거",
-  "디저트",
-  "해산물",
-  "바베큐",
-  "면요리",
-  "튀김",
-  "조림",
-  "찜",
-  "구이",
-  "샐러드",
+  "SOUTHEAST_ASIAN",
+  "INDIAN",
+  "MIDDLE_EASTERN",
+  "MEXICAN",
+  "DESSERT",
 ];
 
 // 스탯 생성 (1-100)
@@ -69,18 +52,48 @@ const getRandomElement = <T>(arr: T[]): T => {
 };
 
 /**
+ * 전문 분야를 생성합니다.
+ * 기본 1개 + 10% 확률로 추가 (최대 3개)
+ */
+const generateSpecialties = (): CuisineType[] => {
+  const specialties: CuisineType[] = [];
+  const availableCuisines = [...CUISINES];
+
+  // 기본 전문분야 1개
+  const firstSpecialty = getRandomElement(availableCuisines);
+  specialties.push(firstSpecialty);
+  availableCuisines.splice(availableCuisines.indexOf(firstSpecialty), 1);
+
+  // 10% 확률로 추가 전문분야 (최대 2개 추가 가능)
+  for (let i = 0; i < 2; i++) {
+    if (Math.random() < 0.1 && availableCuisines.length > 0) {
+      const additionalSpecialty = getRandomElement(availableCuisines);
+      specialties.push(additionalSpecialty);
+      availableCuisines.splice(
+        availableCuisines.indexOf(additionalSpecialty),
+        1
+      );
+    }
+  }
+
+  return specialties;
+};
+
+/**
  * 쉐프를 생성합니다.
  * 모든 쉐프는 실명(name)과 별명(nickname)을 모두 가집니다.
  */
 export const generateChef = (rank: ChefRank): Chef => {
+  const specialties = generateSpecialties();
+
   return {
     id: generateId(),
     name: generateRealName(),
     nickname: generateCombinatorialName(),
     rank,
     stats: generateStats(rank),
-    cuisine: getRandomElement(CUISINES),
-    specialty: getRandomElement(SPECIALTIES),
+    cuisine: specialties[0], // 주 요리 장르 (하위 호환성)
+    specialties, // 전문 분야 배열
     bio: rank === "WHITE" ? "대한민국 최고의 요리사" : "재야의 숨은 고수",
     status: "alive",
     revealedStats:

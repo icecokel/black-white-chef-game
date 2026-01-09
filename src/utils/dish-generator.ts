@@ -1,30 +1,69 @@
-import type { Chef } from "../types/chef";
+import type { Chef, CuisineType } from "../types/chef";
 import type { Dish } from "../types/match";
 
-// 요리 이름 접두사/접미사 (간단한 랜덤 생성용)
-// 메인 재료 리스트 (10개 매치용 + 여유분)
-export const MAIN_INGREDIENTS = [
-  "흑돼지",
-  "전복",
-  "트러플",
-  "한우",
-  "들기름",
-  "랍스터",
-  "두부",
-  "장어",
-  "캐비어",
-  "묵은지",
-  "참치",
-  "가리비",
-  "성게알",
-  "오골계",
-  "고사리",
-  "물곰",
-  "홍어",
-  "토마토",
-  "바질",
-  "치즈",
+// 재료 타입 정의
+export interface Ingredient {
+  name: string;
+  cuisineAffinity: CuisineType[]; // 이 재료와 어울리는 요리 장르
+}
+
+// 메인 재료 리스트 (10개 매치용 + 여유분) - 카테고리 친화도 포함
+export const MAIN_INGREDIENTS: Ingredient[] = [
+  { name: "흑돼지", cuisineAffinity: ["KOREAN"] },
+  { name: "전복", cuisineAffinity: ["KOREAN", "JAPANESE", "CHINESE"] },
+  { name: "트러플", cuisineAffinity: ["WESTERN", "FUSION"] },
+  { name: "한우", cuisineAffinity: ["KOREAN", "WESTERN"] },
+  { name: "들기름", cuisineAffinity: ["KOREAN"] },
+  { name: "랍스터", cuisineAffinity: ["WESTERN", "FUSION"] },
+  { name: "두부", cuisineAffinity: ["KOREAN", "JAPANESE", "CHINESE"] },
+  { name: "장어", cuisineAffinity: ["KOREAN", "JAPANESE"] },
+  { name: "캐비어", cuisineAffinity: ["WESTERN", "FUSION"] },
+  { name: "묵은지", cuisineAffinity: ["KOREAN", "FUSION"] },
+  { name: "참치", cuisineAffinity: ["JAPANESE", "WESTERN"] },
+  { name: "가리비", cuisineAffinity: ["JAPANESE", "WESTERN", "FUSION"] },
+  { name: "성게알", cuisineAffinity: ["JAPANESE"] },
+  { name: "오골계", cuisineAffinity: ["KOREAN", "CHINESE"] },
+  { name: "고사리", cuisineAffinity: ["KOREAN"] },
+  { name: "물곰", cuisineAffinity: ["KOREAN", "FUSION"] },
+  { name: "홍어", cuisineAffinity: ["KOREAN"] },
+  { name: "토마토", cuisineAffinity: ["WESTERN", "MEXICAN", "INDIAN"] },
+  { name: "바질", cuisineAffinity: ["WESTERN", "FUSION"] },
+  { name: "치즈", cuisineAffinity: ["WESTERN", "MEXICAN", "FUSION"] },
+  { name: "쌀국수", cuisineAffinity: ["SOUTHEAST_ASIAN"] },
+  { name: "커리", cuisineAffinity: ["INDIAN", "JAPANESE", "SOUTHEAST_ASIAN"] },
+  { name: "할라피뇨", cuisineAffinity: ["MEXICAN"] },
+  { name: "타히니", cuisineAffinity: ["MIDDLE_EASTERN"] },
+  { name: "램고기", cuisineAffinity: ["MIDDLE_EASTERN", "INDIAN"] },
+  { name: "망고", cuisineAffinity: ["SOUTHEAST_ASIAN", "DESSERT", "INDIAN"] },
+  { name: "팥", cuisineAffinity: ["KOREAN", "JAPANESE", "DESSERT"] },
+  { name: "초콜릿", cuisineAffinity: ["DESSERT", "WESTERN"] },
+  { name: "마라소스", cuisineAffinity: ["CHINESE"] },
+  { name: "코코넛", cuisineAffinity: ["SOUTHEAST_ASIAN", "INDIAN", "DESSERT"] },
+  // 추가 재료 20개
+  { name: "연어", cuisineAffinity: ["JAPANESE", "WESTERN", "FUSION"] },
+  { name: "오리", cuisineAffinity: ["CHINESE", "WESTERN", "KOREAN"] },
+  { name: "새우", cuisineAffinity: ["SOUTHEAST_ASIAN", "JAPANESE", "WESTERN"] },
+  { name: "문어", cuisineAffinity: ["JAPANESE", "WESTERN", "KOREAN"] },
+  { name: "게", cuisineAffinity: ["KOREAN", "JAPANESE", "CHINESE"] },
+  { name: "굴", cuisineAffinity: ["KOREAN", "WESTERN", "JAPANESE"] },
+  { name: "송이버섯", cuisineAffinity: ["KOREAN", "JAPANESE"] },
+  { name: "표고버섯", cuisineAffinity: ["KOREAN", "CHINESE", "JAPANESE"] },
+  { name: "아보카도", cuisineAffinity: ["MEXICAN", "WESTERN", "FUSION"] },
+  { name: "고추냉이", cuisineAffinity: ["JAPANESE"] },
+  { name: "된장", cuisineAffinity: ["KOREAN"] },
+  { name: "간장", cuisineAffinity: ["KOREAN", "JAPANESE", "CHINESE"] },
+  { name: "사프란", cuisineAffinity: ["INDIAN", "MIDDLE_EASTERN", "WESTERN"] },
+  { name: "레몬그라스", cuisineAffinity: ["SOUTHEAST_ASIAN"] },
+  { name: "라임", cuisineAffinity: ["MEXICAN", "SOUTHEAST_ASIAN", "FUSION"] },
+  { name: "파프리카", cuisineAffinity: ["WESTERN", "MEXICAN"] },
+  { name: "딸기", cuisineAffinity: ["DESSERT", "WESTERN"] },
+  { name: "앙금", cuisineAffinity: ["KOREAN", "JAPANESE", "DESSERT"] },
+  { name: "후무스", cuisineAffinity: ["MIDDLE_EASTERN"] },
+  { name: "탄두리", cuisineAffinity: ["INDIAN"] },
 ];
+
+// 재료 이름만 추출 (하위 호환성)
+export const MAIN_INGREDIENT_NAMES = MAIN_INGREDIENTS.map((i) => i.name);
 
 // 요리 이름 접두사/접미사 (다양성 확보)
 const ADJECTIVES = [
@@ -111,6 +150,20 @@ const DESCRIPTIONS = [
   "보는 맛과 먹는 맛을 동시에 잡았습니다.",
 ];
 
+/**
+ * 재료와 쉐프 전문분야 매칭 여부 확인
+ * @returns 매칭된 전문분야가 있으면 true
+ */
+const hasSpecialtyBonus = (chef: Chef, ingredientName: string): boolean => {
+  const ingredient = MAIN_INGREDIENTS.find((i) => i.name === ingredientName);
+  if (!ingredient) return false;
+
+  // 쉐프의 전문분야 중 하나라도 재료 친화도에 포함되면 보너스
+  return chef.specialties.some((specialty) =>
+    ingredient.cuisineAffinity.includes(specialty)
+  );
+};
+
 export const generateDish = (chef: Chef, mainIngredient?: string): Dish => {
   const { proficiency, creativity, taste, mental, speed } = chef.stats;
 
@@ -124,7 +177,14 @@ export const generateDish = (chef: Chef, mainIngredient?: string): Dish => {
   // 완성도는 숙련도와 멘탈의 영향을 받음
   let dishCompleteness = getScore((proficiency + mental) / 2);
 
-  // 2. 특수 변수 영향 (점수에만 영향, 태그에는 영향 X)
+  // 2. 전문분야 보너스 (+10%)
+  if (mainIngredient && hasSpecialtyBonus(chef, mainIngredient)) {
+    dishTaste = Math.round(dishTaste * 1.1);
+    dishCreativity = Math.round(dishCreativity * 1.1);
+    dishCompleteness = Math.round(dishCompleteness * 1.1);
+  }
+
+  // 3. 특수 변수 영향 (점수에만 영향, 태그에는 영향 X)
   // 멘탈이 낮으면 완성도 하락
   if (mental < 70 && Math.random() < 0.2) {
     dishCompleteness -= 30;
@@ -146,7 +206,7 @@ export const generateDish = (chef: Chef, mainIngredient?: string): Dish => {
   dishCreativity = Math.min(100, Math.max(0, dishCreativity));
   dishCompleteness = Math.min(100, Math.max(0, dishCompleteness));
 
-  // 3. 태그 생성 (고정 3개, 구간별 긍정적 멘트)
+  // 4. 태그 생성 (고정 3개, 구간별 긍정적 멘트)
   const tags: string[] = [];
 
   // Taste Tags
@@ -164,7 +224,7 @@ export const generateDish = (chef: Chef, mainIngredient?: string): Dish => {
   else if (dishCompleteness >= 80) tags.push("완벽한 식감");
   else tags.push("새로운 식감");
 
-  // 4. 이름 및 설명 생성
+  // 5. 이름 및 설명 생성
   // 메인 재료가 있으면 이름에 포함
   const randomAdjective =
     ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];

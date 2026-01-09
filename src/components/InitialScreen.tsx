@@ -40,7 +40,7 @@ export function InitialScreen({ onStart }: InitialScreenProps) {
               <CardContent className="p-2 flex flex-col items-center gap-1">
                 <div className="w-full aspect-square bg-muted rounded-md mb-1" />
                 <span className="text-xs font-bold truncate w-full text-center">
-                  {chef.name}
+                  {chef.rank === "BLACK" ? chef.nickname : chef.name}
                 </span>
                 <span className="text-[10px] text-muted-foreground uppercase">
                   {chef.rank} SPOON

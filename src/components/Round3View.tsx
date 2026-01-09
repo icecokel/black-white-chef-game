@@ -28,7 +28,7 @@ export const Round3View = () => {
     rank,
     image: "", // Use ChefCard's default placeholder
     cuisine: "FUSION", // Dummy
-    specialty: "Teamwork", // Dummy
+    specialties: ["FUSION"], // Dummy
     status: "alive",
     stats: {
       taste: dish.scores.taste,

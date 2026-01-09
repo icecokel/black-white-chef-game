@@ -130,7 +130,7 @@ export const playRound3MatchAction = (
   const blackTeamChef = createTeamChef(blackTeam, "team-black", "흑수저 팀");
   const whiteTeamChef = createTeamChef(whiteTeam, "team-white", "백수저 팀");
 
-  const mainIngredient = MAIN_INGREDIENTS[matchIndex];
+  const mainIngredient = MAIN_INGREDIENTS[matchIndex].name;
   const blackDish = generateDish(blackTeamChef, mainIngredient);
   const whiteDish = generateDish(whiteTeamChef, mainIngredient);
 

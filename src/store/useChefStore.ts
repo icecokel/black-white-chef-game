@@ -575,7 +575,8 @@ export const useChefStore = create<ChefStore>((set, get) => ({
     // 재료 생성 (10개 유니크)
     const ingredients = [...MAIN_INGREDIENTS]
       .sort(() => Math.random() - 0.5)
-      .slice(0, matchCount);
+      .slice(0, matchCount)
+      .map((i) => i.name);
 
     for (let i = 0; i < matchCount; i++) {
       const mainIngredient = ingredients[i];
@@ -897,7 +898,7 @@ export const useChefStore = create<ChefStore>((set, get) => ({
     const whiteTeamChef = createTeamChef(whiteTeam, "team-white", "백수저 팀");
 
     // 요리 생성
-    const mainIngredient = MAIN_INGREDIENTS[matchIndex]; // 매치별 고정 재료 사용
+    const mainIngredient = MAIN_INGREDIENTS[matchIndex].name; // 매치별 고정 재료 사용
     const blackDish = generateDish(blackTeamChef, mainIngredient);
     const whiteDish = generateDish(whiteTeamChef, mainIngredient);
 

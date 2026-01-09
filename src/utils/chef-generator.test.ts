@@ -12,7 +12,8 @@ describe("chef-generator", () => {
       expect(chef.rank).toBe("BLACK");
       expect(chef.status).toBe("alive");
       expect(chef.cuisine).toBeDefined();
-      expect(chef.specialty).toBeDefined();
+      expect(chef.specialties).toBeDefined();
+      expect(chef.specialties.length).toBeGreaterThanOrEqual(1);
     });
 
     it("백수저 쉐프를 올바르게 생성해야 한다", () => {

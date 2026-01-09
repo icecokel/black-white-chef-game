@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import type { Chef } from "@/types/chef";
+import { CUISINE_LABELS } from "@/types/chef";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import type { JudgingResult } from "@/types/round";
@@ -185,6 +186,18 @@ export const ChefCard = ({
             >
               {isBlack ? chef.nickname : chef.name}
             </h3>
+
+            {/* 전문분야 표시 */}
+            {chef.specialties && chef.specialties.length > 0 && (
+              <p
+                className={cn(
+                  "text-xs opacity-70 truncate",
+                  layout === "horizontal" ? "text-[10px]" : "mb-1"
+                )}
+              >
+                {chef.specialties.map((s) => CUISINE_LABELS[s]).join(" · ")}
+              </p>
+            )}
 
             <div
               className={cn(

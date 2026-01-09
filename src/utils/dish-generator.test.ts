@@ -17,7 +17,7 @@ const createMockChef = (overrides: Partial<Chef> = {}): Chef => ({
   },
   revealedStats: ["taste"],
   cuisine: "KOREAN",
-  specialty: "비빔밥",
+  specialties: ["KOREAN"],
   bio: "테스트용 쉐프",
   status: "alive",
   ...overrides,

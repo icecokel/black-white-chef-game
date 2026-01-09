@@ -39,7 +39,8 @@ export const createRound2Matches = (
   const matchCount = Math.min(shuffledBlack.length, shuffledWhite.length);
   const ingredients = [...MAIN_INGREDIENTS]
     .sort(() => Math.random() - 0.5)
-    .slice(0, matchCount);
+    .slice(0, matchCount)
+    .map((i) => i.name);
 
   const matches: Match[] = [];
 
