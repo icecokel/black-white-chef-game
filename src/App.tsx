@@ -1,19 +1,58 @@
-import { useState } from "react";
+import type { Chef } from "./types/chef";
+import { ChefCard } from "./components/ChefCard";
+
+const SAMPLE_BLACK_SPOON: Chef = {
+  id: "black-1",
+  name: "히든 천재",
+  rank: "BLACK",
+  stats: {
+    proficiency: 95,
+    creativity: 98,
+    taste: 92,
+    mental: 85,
+    speed: 90,
+  },
+};
+
+const SAMPLE_WHITE_SPOON: Chef = {
+  id: "white-1",
+  name: "에드워드 리",
+  rank: "WHITE",
+  stats: {
+    proficiency: 99,
+    creativity: 96,
+    taste: 97,
+    mental: 98,
+    speed: 88,
+  },
+};
 
 function App() {
-  const [count, setCount] = useState(0);
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
-      <h1 className="text-4xl font-bold mb-4">Culinary Class Wars</h1>
-      <div className="p-4 border rounded-lg shadow-lg bg-card text-card-foreground">
-        <p className="mb-4">Tailwind CSS v4 + shadcn/ui Setup Complete</p>
-        <button
-          className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          count is {count}
-        </button>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-8 gap-12">
+      <div className="text-center space-y-2">
+        <h1 className="text-4xl font-bold tracking-tighter">
+          Culinary Class Wars
+        </h1>
+        <p className="text-muted-foreground">
+          Cinematic Theme & Card Component Verification
+        </p>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-8 items-center justify-center w-full max-w-4xl">
+        <div className="w-64">
+          <ChefCard chef={SAMPLE_BLACK_SPOON} />
+          <p className="text-center mt-4 text-sm text-muted-foreground">
+            Black Spoon Variant
+          </p>
+        </div>
+
+        <div className="w-64">
+          <ChefCard chef={SAMPLE_WHITE_SPOON} />
+          <p className="text-center mt-4 text-sm text-muted-foreground">
+            White Spoon Variant
+          </p>
+        </div>
       </div>
     </div>
   );
