@@ -13,11 +13,19 @@ export interface Round3State {
   userPrediction: "BLACK" | "WHITE" | null;
 }
 
+export interface Round2State {
+  phase: "picking" | "revealing_user" | "revealing_random" | "summary";
+  userPicks: string[]; // chef outcome prediction (max 2) - chefId
+  highlightMatches: string[]; // ids of matches to highlight (random 3)
+  currentRevealIndex: number; // index for sequential reveal
+}
+
 export interface Round {
   roundNumber: number;
   status: RoundStatus;
   matches?: Match[]; // 2라운드용 매치 정보 (Round 2)
-  round3State?: Round3State; // 3라운드용 상태 (Round 3)
+  round2State?: Round2State; // 2라운드 상태 (Round 2)
+  round3State?: Round3State; // 3라운드 상태 (Round 3)
   cookingChefIds: string[]; // 요리 중인 쉐프 ID
   judgingQueue: string[]; // 심사 대기 큐 (요리 완료된 쉐프 ID)
   currentJudgingIndex: number; // 현재 심사 인덱스

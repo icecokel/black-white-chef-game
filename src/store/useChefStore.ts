@@ -45,6 +45,10 @@ interface ChefStore {
   setRound3Prediction: (prediction: "BLACK" | "WHITE") => void;
   isRoundComplete: () => boolean;
   autoPickBlackChefs: () => void;
+  toggleRound2UserPick: (chefId: string) => void;
+  proceedToRound2Reveal: () => void;
+  proceedToRound2Summary: () => void;
+  playNextRound2Highlight: () => void;
 }
 
 // 속도 기반 완료 순서 (높을수록 먼저 완료)
@@ -148,19 +152,156 @@ export const useChefStore = create<ChefStore>((set, get) => ({
 
     if (needToPick <= 0) return;
 
-    const availableChefs = chefs.filter(
-      (c) => c.rank === "BLACK" && c.status === "alive" && !c.isPlayerPick
-    );
-
-    // Random shuffle
-    const shuffled = [...availableChefs].sort(() => Math.random() - 0.5);
-    const selected = shuffled.slice(0, needToPick);
-    const selectedIds = selected.map((c) => c.id);
+    // 점수 높은 순으로 자동 선택
+    const available = chefs
+      .filter(
+        (c) => c.rank === "BLACK" && c.status === "alive" && !c.isPlayerPick
+      )
+      .sort((a, b) => b.stats.proficiency - a.stats.proficiency)
+      .slice(0, needToPick);
 
     set((state) => ({
       chefs: state.chefs.map((c) =>
-        selectedIds.includes(c.id) ? { ...c, isPlayerPick: true } : c
+        available.find((a) => a.id === c.id) ? { ...c, isPlayerPick: true } : c
       ),
+    }));
+  },
+
+  toggleRound2UserPick: (chefId: string) => {
+    const { currentRound } = get();
+    if (
+      !currentRound ||
+      currentRound.roundNumber !== 2 ||
+      !currentRound.round2State ||
+      currentRound.round2State.phase !== "picking"
+    ) {
+      return;
+    }
+
+    const { userPicks } = currentRound.round2State;
+    const isAlreadyPicked = userPicks.includes(chefId);
+
+    let newUserPicks;
+    if (isAlreadyPicked) {
+      newUserPicks = userPicks.filter((id) => id !== chefId);
+    } else {
+      if (userPicks.length >= 2) return; // 최대 2명
+      newUserPicks = [...userPicks, chefId];
+    }
+
+    set((state) => ({
+      currentRound: state.currentRound
+        ? {
+            ...state.currentRound,
+            round2State: {
+              ...state.currentRound.round2State!,
+              userPicks: newUserPicks,
+            },
+          }
+        : null,
+    }));
+  },
+
+  proceedToRound2Reveal: () => {
+    const { currentRound, judgeMatch } = get();
+    if (
+      !currentRound ||
+      currentRound.roundNumber !== 2 ||
+      !currentRound.round2State
+    )
+      return;
+
+    const { matches, round2State } = currentRound;
+    if (!matches) return;
+
+    // 1. 모든 매치 심사 진행 (결과 미리 생성)
+    matches.forEach((match) => judgeMatch(match.id));
+
+    // 2. 하이라이트 매치 선정 (유저 픽 제외 랜덤 3개)
+    const userPickMatchIds = matches
+      .filter(
+        (m) =>
+          round2State.userPicks.includes(m.blackChefId) ||
+          round2State.userPicks.includes(m.whiteChefId)
+      )
+      .map((m) => m.id);
+
+    const otherMatchIds = matches
+      .map((m) => m.id)
+      .filter((id) => !userPickMatchIds.includes(id))
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3);
+
+    const highlightMatches = [...userPickMatchIds, ...otherMatchIds];
+
+    set((state) => ({
+      currentRound: state.currentRound
+        ? {
+            ...state.currentRound,
+            status: "judging",
+            round2State: {
+              ...state.currentRound.round2State!,
+              phase: "revealing_user", // 시작은 유저 픽부터
+              highlightMatches,
+              currentRevealIndex: 0,
+            },
+            messageLog: [
+              "🥁 심사가 종료되었습니다.",
+              "결과를 공개합니다!",
+              `당신의 선택: ${round2State.userPicks.length}명`,
+            ],
+          }
+        : null,
+    }));
+  },
+
+  playNextRound2Highlight: () => {
+    const { currentRound } = get();
+    if (
+      !currentRound ||
+      currentRound.roundNumber !== 2 ||
+      !currentRound.round2State
+    )
+      return;
+
+    const { highlightMatches, currentRevealIndex } = currentRound.round2State;
+
+    if (currentRevealIndex < highlightMatches.length - 1) {
+      // 다음 하이라이트로 이동
+      set((state) => ({
+        currentRound: state.currentRound
+          ? {
+              ...state.currentRound,
+              round2State: {
+                ...state.currentRound.round2State!,
+                currentRevealIndex: currentRevealIndex + 1,
+              },
+            }
+          : null,
+      }));
+    } else {
+      // 하이라이트 종료 -> 요약 페이지로
+      get().proceedToRound2Summary();
+    }
+  },
+
+  proceedToRound2Summary: () => {
+    set((state) => ({
+      currentRound: state.currentRound
+        ? {
+            ...state.currentRound,
+            status: "completed",
+            round2State: {
+              ...state.currentRound.round2State!,
+              phase: "summary",
+            },
+            messageLog: [
+              ...state.currentRound.messageLog,
+              "🏁 모든 대결이 종료되었습니다.",
+              "최종 생존자를 확인하세요.",
+            ],
+          }
+        : null,
     }));
   },
 
@@ -596,20 +737,26 @@ export const useChefStore = create<ChefStore>((set, get) => ({
 
     const newRound: Round = {
       roundNumber: 2,
-      status: "cooking", // 2라운드는 바로 요리(매칭 확인)부터 시작
+      status: "picking", // [FIX] "cooking" -> "picking"으로 변경
       matches: matches,
-      cookingChefIds: [], // 사용 안함
-      judgingQueue: [], // 사용 안함
+      cookingChefIds: [],
+      judgingQueue: [],
       currentJudgingIndex: 0,
       passedChefIds: [],
       pendingChefIds: [],
       eliminatedChefIds: [],
       targetPassCount: 10,
-      userPickLimit: 0,
+      userPickLimit: 2, // [FIX] 0 -> 2
       cycleComplete: false,
+      round2State: {
+        phase: "picking",
+        userPicks: [],
+        highlightMatches: [],
+        currentRevealIndex: 0,
+      },
       messageLog: [
         "⚔️ 라운드 2: 1vs1 흑백 대전 시작!",
-        "조별 1:1 매칭이 완료되었습니다.",
+        "승리할 쉐프 2명을 예측해보세요!",
       ],
     };
 

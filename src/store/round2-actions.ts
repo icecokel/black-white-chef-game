@@ -86,8 +86,14 @@ export const startRound2Action = (
 
   const newRound: Round = {
     roundNumber: 2,
-    status: "cooking",
+    status: "picking", // starts with picking phase
     matches: matches,
+    round2State: {
+      phase: "picking",
+      userPicks: [],
+      highlightMatches: [],
+      currentRevealIndex: 0,
+    },
     cookingChefIds: [],
     judgingQueue: [],
     currentJudgingIndex: 0,
@@ -99,7 +105,7 @@ export const startRound2Action = (
     cycleComplete: false,
     messageLog: [
       "⚔️ 라운드 2: 1vs1 흑백 대전 시작!",
-      "조별 1:1 매칭이 완료되었습니다.",
+      "승리할 것 같은 쉐프 2명을 선택해주세요.",
     ],
   };
 

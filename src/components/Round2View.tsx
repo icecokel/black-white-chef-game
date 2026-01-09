@@ -2,16 +2,12 @@ import { useState, useEffect } from "react";
 import { useChefStore } from "../store/useChefStore";
 import { Button } from "./ui/button";
 import { ChefCard } from "./ChefCard";
-import type { Dish } from "../types/match";
+import type { Dish, Match } from "../types/match";
+import { Round2MatchList } from "./Round2MatchList";
+import { Round2Summary } from "./Round2Summary";
 
 export const Round2View = () => {
-  const { currentRound, chefs, startRound2, judgeMatch, startRound3 } =
-    useChefStore();
-  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
-  const [showResult, setShowResult] = useState(false);
-  const [userPrediction, setUserPrediction] = useState<
-    "BLACK" | "WHITE" | null
-  >(null);
+  const { currentRound, startRound2, playNextRound2Highlight } = useChefStore();
 
   // 라운드 진입 시 자동 시작
   useEffect(() => {
@@ -23,95 +19,98 @@ export const Round2View = () => {
     }
   }, [currentRound, startRound2]);
 
-  if (
-    !currentRound ||
-    currentRound.roundNumber !== 2 ||
-    !currentRound.matches
-  ) {
+  if (!currentRound || currentRound.roundNumber !== 2) {
     return (
       <div className="text-white text-center p-10">라운드 2 준비 중...</div>
     );
   }
 
-  if (currentRound.status === "completed") {
+  // 1. Picking Phase
+  if (currentRound.round2State?.phase === "picking") {
+    return <Round2MatchList />;
+  }
+
+  // 2. Summary Phase
+  if (currentRound.round2State?.phase === "summary") {
+    return <Round2Summary />;
+  }
+
+  // 3. Revealing Phase (Highlight Matches)
+  if (
+    (currentRound.round2State?.phase === "revealing_user" ||
+      currentRound.round2State?.phase === "revealing_random") &&
+    currentRound.matches
+  ) {
+    const { highlightMatches, currentRevealIndex, userPicks } =
+      currentRound.round2State;
+    const matchId = highlightMatches[currentRevealIndex];
+    const match = currentRound.matches.find((m) => m.id === matchId);
+
+    if (!match) return <div>매치 정보 오류</div>;
+
+    const isUserPickMatch =
+      userPicks.includes(match.blackChefId) ||
+      userPicks.includes(match.whiteChefId);
+
+    // 유저가 예측한 진영 ("BLACK" | "WHITE" | null) -- 이 화면에서는 이미 결정됨
+    // 여기서는 유저 픽이 누구였는지 보여주는 용도
+    const myPickSide = userPicks.includes(match.blackChefId)
+      ? "BLACK"
+      : userPicks.includes(match.whiteChefId)
+      ? "WHITE"
+      : null;
+
     return (
-      <div className="flex flex-col items-center gap-6 p-8 h-[calc(100vh-100px)] overflow-y-auto">
-        <h2 className="text-3xl font-bold">Round 2 완료!</h2>
-
-        <Button
-          size="lg"
-          onClick={() => startRound3()}
-          className="bg-white text-black hover:bg-gray-200 font-bold text-lg px-8 py-6 animate-pulse"
-        >
-          ⚔️ 3라운드 시작하기
-        </Button>
-
-        <div className="flex gap-8 text-center bg-gray-900/50 p-6 rounded-xl border border-gray-800">
-          <div>
-            <p className="text-4xl font-bold text-spoon-black-accent">
-              {
-                chefs.filter((c) => c.rank === "BLACK" && c.status === "alive")
-                  .length
-              }
-            </p>
-            <p className="text-muted-foreground">흑수저 생존</p>
-          </div>
-          <div className="text-4xl font-thin opacity-30">|</div>
-          <div>
-            <p className="text-4xl font-bold text-spoon-white-accent">
-              {
-                chefs.filter((c) => c.rank === "WHITE" && c.status === "alive")
-                  .length
-              }
-            </p>
-            <p className="text-muted-foreground">백수저 생존</p>
-          </div>
-        </div>
-
-        <div className="mt-4 w-full max-w-6xl">
-          <h3 className="text-xl font-bold mb-4 text-center">생존자 명단</h3>
-          <div className="grid grid-cols-5 gap-4">
-            {chefs
-              .filter((c) => c.status === "alive")
-              .map((chef) => (
-                <div key={chef.id} className="scale-90">
-                  <ChefCard chef={chef} isFlipped={true} />
-                </div>
-              ))}
-          </div>
-        </div>
-      </div>
+      <Round2MatchDetail
+        match={match}
+        matchIndex={currentRevealIndex}
+        totalMatches={highlightMatches.length}
+        onNext={playNextRound2Highlight}
+        myPickSide={myPickSide}
+        isUserPickMatch={isUserPickMatch}
+      />
     );
   }
 
-  const matcheCount = currentRound.matches.length;
-  const match = currentRound.matches[currentMatchIndex];
+  return <div>라운드 상태 오류</div>;
+};
+
+// -- Internal Component: Match Detail --
+const Round2MatchDetail = ({
+  match,
+  matchIndex,
+  totalMatches,
+  onNext,
+  myPickSide,
+  isUserPickMatch,
+}: {
+  match: Match;
+  matchIndex: number;
+  totalMatches: number;
+  onNext: () => void;
+  myPickSide: "BLACK" | "WHITE" | null;
+  isUserPickMatch: boolean;
+}) => {
+  const { chefs, judgeMatch } = useChefStore();
+  const [showResult, setShowResult] = useState(false);
+
+  // 자동 재생 연출 (심사 대기 -> 결과 공개)
+  useEffect(() => {
+    setShowResult(false);
+    const timer = setTimeout(() => {
+      setShowResult(true);
+      // 이미 결과는 store level에서 judgeMatch로 생성되어 있음
+    }, 2000); // 2초 두근두근
+
+    return () => clearTimeout(timer);
+  }, [match.id]);
 
   const blackChef = chefs.find((c) => c.id === match.blackChefId);
   const whiteChef = chefs.find((c) => c.id === match.whiteChefId);
 
-  const handlePrediction = (prediction: "BLACK" | "WHITE") => {
-    if (userPrediction) return; // 이미 선택함
-    setUserPrediction(prediction);
-
-    // 심사 시작
-    setTimeout(() => {
-      judgeMatch(match.id);
-      setShowResult(true);
-    }, 600);
-  };
-
-  const handleNextMatch = () => {
-    if (currentMatchIndex < matcheCount - 1) {
-      setCurrentMatchIndex((prev) => prev + 1);
-      setShowResult(false);
-      setUserPrediction(null);
-    }
-  };
-
   const getVoteComment = (type: "P" | "A") => {
     const vote = match.votes.find((v) => v.judge === type);
-    if (!vote) return "심사 중...";
+    if (!vote) return "...";
     return `"${vote.comment}"`;
   };
 
@@ -121,72 +120,67 @@ export const Round2View = () => {
     return vote.pick === match.blackChefId ? "BLACK" : "WHITE";
   };
 
-  const isPredictionCorrect =
-    match.winnerId &&
-    ((userPrediction === "BLACK" && match.winnerId === match.blackChefId) ||
-      (userPrediction === "WHITE" && match.winnerId === match.whiteChefId));
+  const isWin =
+    (myPickSide === "BLACK" && match.winnerId === match.blackChefId) ||
+    (myPickSide === "WHITE" && match.winnerId === match.whiteChefId);
 
   return (
     <div className="flex flex-col h-[calc(100vh-100px)] p-6 gap-6 relative">
       {/* Top Status */}
       <div className="flex justify-between items-center text-white p-4 bg-gray-900/50 rounded-xl">
-        <h2 className="text-xl font-bold">Round 2: 1vs1 흑백 대전</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-bold">Round 2: 하이라이트 매치</h2>
+          {isUserPickMatch && (
+            <span className="bg-amber-500 text-black text-xs font-bold px-2 py-1 rounded animate-pulse">
+              MY PICK MATCH
+            </span>
+          )}
+        </div>
         <div className="text-lg font-mono">
-          MATCH {currentMatchIndex + 1} / {matcheCount}
+          PLAYING {matchIndex + 1} / {totalMatches}
         </div>
       </div>
 
       {/* Main Match Area */}
       <div className="flex-1 flex gap-8 items-stretch justify-center">
-        {/* Black Chef Side */}
+        {/* Black Side */}
         <div className="flex-1 flex flex-col gap-6 items-center">
-          {/* Dish Area (Prominent) */}
           <div
-            className={`flex-1 w-full max-w-md bg-gray-800/60 rounded-xl border-2 p-6 flex items-center justify-center relative overflow-hidden group transition-all duration-300 cursor-pointer
+            className={`flex-1 w-full max-w-md bg-gray-800/60 rounded-xl border-2 p-6 flex items-center justify-center relative overflow-hidden transition-all duration-500
               ${
-                userPrediction === "BLACK"
-                  ? "border-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.3)]"
-                  : "border-gray-700/50 hover:border-gray-500"
+                myPickSide === "BLACK"
+                  ? "border-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.2)]"
+                  : "border-gray-700/50"
               }
               ${
-                userPrediction && userPrediction !== "BLACK"
+                showResult && match.loserId === match.blackChefId
                   ? "opacity-50 grayscale"
-                  : ""
+                  : "opacity-100"
               }
             `}
-            onClick={() => !userPrediction && handlePrediction("BLACK")}
           >
-            {/* Hover Effect Helper */}
-            {!userPrediction && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 font-bold text-2xl text-amber-500">
-                승리 예측하기
-              </div>
-            )}
-
-            <div className="absolute inset-0 bg-gradient-to-br from-black/40 to-transparent transition-all" />
-
             {match.blackDish && <DishCard dish={match.blackDish} size="lg" />}
             <div className="absolute top-4 left-4">
               <span className="bg-black/80 text-white px-3 py-1 rounded-full text-sm font-bold border border-gray-600">
-                BLACK DISH
+                BLACK
               </span>
             </div>
-            {userPrediction === "BLACK" && (
-              <div className="absolute top-4 right-4 z-20 bg-amber-500 text-black px-3 py-1 rounded-full text-sm font-bold animate-pulse">
+            {myPickSide === "BLACK" && (
+              <div className="absolute top-4 right-4 z-20 bg-amber-500 text-black px-3 py-1 rounded-full text-sm font-bold">
                 MY PICK
               </div>
             )}
+            {/* 승리 뱃지 */}
+            {showResult && match.winnerId === match.blackChefId && (
+              <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+                <div className="bg-green-500 text-white text-4xl font-black px-8 py-4 rounded-xl border-4 border-white shadow-2xl animate-bounce-custom transform rotate-12">
+                  WINNER!
+                </div>
+              </div>
+            )}
           </div>
-
-          {/* Chef Info (Smaller) */}
           {blackChef && (
-            <div
-              className={`w-full max-w-sm transition-all duration-500 ${
-                userPrediction && userPrediction !== "BLACK"
-                  ? "opacity-40"
-                  : "opacity-100"
-              }`}
-            >
+            <div className="w-full max-w-sm">
               <ChefCard
                 chef={blackChef}
                 isFlipped={true}
@@ -197,31 +191,26 @@ export const Round2View = () => {
           )}
         </div>
 
-        {/* VS / Judging Area */}
-        <div className="w-96 flex flex-col gap-2 items-center justify-center z-10 pt-10">
-          {/* Main Ingredient Badge - Moved up and styled to avoid overlap */}
-          {match.mainIngredient && (
-            <div className="flex flex-col items-center animate-bounce-custom mb-4 relative z-30">
-              <span className="text-gray-400 text-[10px] tracking-[0.2em] uppercase mb-1">
-                Main Ingredient
-              </span>
-              <div className="bg-gradient-to-r from-amber-600 to-yellow-600 text-white px-8 py-3 rounded-full text-2xl font-black shadow-lg border-2 border-amber-400/50 min-w-[200px] text-center">
-                {match.mainIngredient}
-              </div>
+        {/* Center / Result Area */}
+        <div className="w-96 flex flex-col gap-4 items-center justify-center z-10">
+          {/* Main Ingredient */}
+          <div className="flex flex-col items-center mb-4">
+            <div className="bg-gradient-to-r from-amber-600 to-yellow-600 text-white px-8 py-2 rounded-full text-xl font-bold shadow-lg border border-amber-400/50">
+              {match.mainIngredient}
             </div>
-          )}
+          </div>
 
           {!showResult ? (
-            <div className="flex flex-col items-center justify-center py-10">
-              <div className="text-8xl font-black italic text-red-600 drop-shadow-lg mb-8 scale-110">
+            <div className="flex flex-col items-center justify-center py-10 animate-pulse">
+              <div className="text-8xl font-black italic text-red-600 drop-shadow-lg mb-8">
                 VS
               </div>
-              <p className="text-gray-400 text-sm animate-pulse">
-                승리할 것 같은 요리를 선택하세요
+              <p className="text-amber-400 font-bold text-lg">
+                심사 위원 맛 평가 중...
               </p>
             </div>
           ) : (
-            <div className="w-full flex flex-col gap-4 bg-black/60 p-6 rounded-lg border border-gray-700 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-300">
+            <div className="w-full flex flex-col gap-4 bg-black/60 p-6 rounded-lg border border-gray-700 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-500">
               {/* Judge P */}
               <div className="flex justify-between items-center rounded bg-black/40 p-3 border border-gray-800">
                 <div className="flex flex-col gap-1">
@@ -232,16 +221,12 @@ export const Round2View = () => {
                     className={`text-lg font-bold ${
                       getVoteResult("P") === "BLACK"
                         ? "text-gray-300"
-                        : getVoteResult("P") === "WHITE"
-                        ? "text-white"
-                        : "text-gray-500"
+                        : "text-white"
                     }`}
                   >
                     {getVoteResult("P") === "BLACK"
                       ? "⚫️ 흑수저"
-                      : getVoteResult("P") === "WHITE"
-                      ? "⚪️ 백수저"
-                      : "심사 중..."}
+                      : "⚪️ 백수저"}
                   </div>
                 </div>
                 <div className="text-xs text-gray-400 italic max-w-[140px] text-right border-l border-gray-600 pl-3">
@@ -259,16 +244,12 @@ export const Round2View = () => {
                     className={`text-lg font-bold ${
                       getVoteResult("A") === "BLACK"
                         ? "text-gray-300"
-                        : getVoteResult("A") === "WHITE"
-                        ? "text-white"
-                        : "text-gray-500"
+                        : "text-white"
                     }`}
                   >
                     {getVoteResult("A") === "BLACK"
                       ? "⚫️ 흑수저"
-                      : getVoteResult("A") === "WHITE"
-                      ? "⚪️ 백수저"
-                      : "심사 중..."}
+                      : "⚪️ 백수저"}
                   </div>
                 </div>
                 <div className="text-xs text-gray-400 italic max-w-[140px] text-right border-l border-gray-600 pl-3">
@@ -276,99 +257,83 @@ export const Round2View = () => {
                 </div>
               </div>
 
-              {/* Results */}
-              {match.isTie ? (
-                <div className="bg-yellow-500/10 text-yellow-500 px-4 py-3 rounded-lg text-center border border-yellow-500/30 shadow-lg mt-2">
-                  <div className="text-3xl font-black mb-1">1 : 1</div>
-                  <div className="text-sm font-bold text-white mb-2">
-                    {match.winnerId === match.blackChefId
-                      ? "무승부 (흑수저 판정승)"
-                      : "무승부 (백수저 판정승)"}
-                  </div>
+              {/* Final Score */}
+              <div
+                className={`text-center px-4 py-3 rounded-lg border shadow-lg mt-2 ${
+                  match.isTie
+                    ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/30"
+                    : "bg-green-500/10 text-green-500 border-green-500/30"
+                }`}
+              >
+                <div className="text-3xl font-black mb-1">
+                  {match.isTie ? "1 : 1" : "2 : 0"}
                 </div>
-              ) : (
-                <div className="bg-green-500/10 text-green-500 px-4 py-3 rounded-lg text-center border border-green-500/30 shadow-lg mt-2">
-                  <div className="text-4xl font-black mb-1">2 : 0</div>
-                  <div className="text-lg font-bold text-white">
-                    🏆{" "}
-                    {match.winnerId === match.blackChefId ? "흑수저" : "백수저"}{" "}
-                    생존!
-                  </div>
+                <div className="text-sm font-bold text-white">
+                  {match.isTie ? "무승부 (랜덤 판정)" : "완승!"}
                 </div>
-              )}
+              </div>
 
-              {/* Prediction Result Msg */}
-              {isPredictionCorrect ? (
-                <div className="text-center text-green-400 font-bold text-sm animate-pulse">
-                  ✨ 예측 성공! 안목이 대단하시네요.
-                </div>
-              ) : (
-                <div className="text-center text-red-400 font-bold text-sm">
-                  😓 아쉽네요... 다음엔 맞혀보세요!
+              {myPickSide && (
+                <div
+                  className={`text-center font-bold text-sm animate-pulse ${
+                    isWin ? "text-green-400" : "text-red-400"
+                  }`}
+                >
+                  {isWin
+                    ? "✨ 예측 성공! 안목이 대단하시네요."
+                    : "😓 아쉽게도 예측이 빗나갔습니다."}
                 </div>
               )}
 
               <Button
                 size="lg"
-                className="w-full mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-6 text-lg shadow-lg border border-blue-400/30 animate-pulse"
-                onClick={handleNextMatch}
-                disabled={currentMatchIndex >= matcheCount - 1}
+                className="w-full mt-2 bg-white text-black hover:bg-gray-200 font-bold py-4 text-lg"
+                onClick={onNext}
               >
-                다음 매치 진행 ➡️
+                다음 ➡️
               </Button>
             </div>
           )}
         </div>
 
-        {/* White Chef Side */}
+        {/* White Side */}
         <div className="flex-1 flex flex-col gap-6 items-center">
-          {/* Dish Area (Prominent) */}
           <div
-            className={`flex-1 w-full max-w-md bg-gray-800/60 rounded-xl border-2 p-6 flex items-center justify-center relative overflow-hidden group transition-all duration-300 cursor-pointer
+            className={`flex-1 w-full max-w-md bg-gray-800/60 rounded-xl border-2 p-6 flex items-center justify-center relative overflow-hidden transition-all duration-500
                 ${
-                  userPrediction === "WHITE"
-                    ? "border-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.3)]"
-                    : "border-gray-700/50 hover:border-gray-500"
+                  myPickSide === "WHITE"
+                    ? "border-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.2)]"
+                    : "border-gray-700/50"
                 }
                 ${
-                  userPrediction && userPrediction !== "WHITE"
+                  showResult && match.loserId === match.whiteChefId
                     ? "opacity-50 grayscale"
-                    : ""
+                    : "opacity-100"
                 }
               `}
-            onClick={() => !userPrediction && handlePrediction("WHITE")}
           >
-            {/* Hover Effect Helper */}
-            {!userPrediction && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-white/20 font-bold text-2xl text-black shadow-inner">
-                승리 예측하기
-              </div>
-            )}
-
-            <div className="absolute inset-0 bg-gradient-to-bl from-white/10 to-transparent transition-all" />
-
             {match.whiteDish && <DishCard dish={match.whiteDish} size="lg" />}
             <div className="absolute top-4 right-4">
               <span className="bg-white/90 text-black px-3 py-1 rounded-full text-sm font-bold border border-gray-400">
-                WHITE DISH
+                WHITE
               </span>
             </div>
-            {userPrediction === "WHITE" && (
-              <div className="absolute top-4 left-4 z-20 bg-amber-500 text-black px-3 py-1 rounded-full text-sm font-bold animate-pulse">
+            {myPickSide === "WHITE" && (
+              <div className="absolute top-4 left-4 z-20 bg-amber-500 text-black px-3 py-1 rounded-full text-sm font-bold">
                 MY PICK
               </div>
             )}
+            {/* 승리 뱃지 */}
+            {showResult && match.winnerId === match.whiteChefId && (
+              <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+                <div className="bg-green-500 text-white text-4xl font-black px-8 py-4 rounded-xl border-4 border-white shadow-2xl animate-bounce-custom transform -rotate-12">
+                  WINNER!
+                </div>
+              </div>
+            )}
           </div>
-
-          {/* Chef Info (Smaller) */}
           {whiteChef && (
-            <div
-              className={`w-full max-w-sm transition-all duration-500 ${
-                userPrediction && userPrediction !== "WHITE"
-                  ? "opacity-40"
-                  : "opacity-100"
-              }`}
-            >
+            <div className="w-full max-w-sm">
               <ChefCard chef={whiteChef} isFlipped={true} layout="horizontal" />
             </div>
           )}
