@@ -71,6 +71,9 @@ export const startRound1JudgingAction = (
   const aliveBlackChefs = chefs.filter(
     (c) => c.rank === "BLACK" && c.status === "alive"
   );
+
+  if (aliveBlackChefs.length === 0) return null;
+
   const cookingOrder = createSpeedWeightedOrder(aliveBlackChefs);
 
   const initialReady = cookingOrder.slice(0, COOKING_BATCH_SIZE);
@@ -199,7 +202,8 @@ export const processPendingChefsAction = (
     .sort((a, b) => {
       const sumA = Object.values(a.stats).reduce((acc, v) => acc + v, 0);
       const sumB = Object.values(b.stats).reduce((acc, v) => acc + v, 0);
-      return sumB - sumA;
+      if (sumA !== sumB) return sumB - sumA;
+      return a.id.localeCompare(b.id);
     });
 
   const chefsToPass = pendingChefs.slice(0, remainingSlots);
@@ -226,7 +230,8 @@ export const processEliminatedChefsAction = (
     .sort((a, b) => {
       const sumA = Object.values(a.stats).reduce((acc, v) => acc + v, 0);
       const sumB = Object.values(b.stats).reduce((acc, v) => acc + v, 0);
-      return sumB - sumA;
+      if (sumA !== sumB) return sumB - sumA;
+      return a.id.localeCompare(b.id);
     });
 
   const chefsToRevive = eliminatedChefs.slice(0, remainingSlots);

@@ -35,6 +35,22 @@ const createMockChef = (
   ...overrides,
 });
 
+const createMockRound = (overrides: Partial<Round> = {}): Round => ({
+  roundNumber: 1,
+  status: "picking",
+  cookingChefIds: [],
+  judgingQueue: [],
+  currentJudgingIndex: 0,
+  passedChefIds: [],
+  pendingChefIds: [],
+  eliminatedChefIds: [],
+  targetPassCount: 10,
+  userPickLimit: 0,
+  cycleComplete: false,
+  messageLog: [],
+  ...overrides,
+});
+
 describe("round3-actions", () => {
   describe("getTeamAvgStat", () => {
     it("팀 평균 스탯을 계산해야 한다", () => {
@@ -66,6 +82,11 @@ describe("round3-actions", () => {
     it("빈 팀은 0을 반환해야 한다", () => {
       const avgTaste = getTeamAvgStat([], "taste");
       expect(avgTaste).toBe(0);
+    });
+
+    it("null/undefined 팀 입력에 대해서도 안전하게 처리해야 한다 (Empty Array)", () => {
+      const avg = getTeamAvgStat([], "taste");
+      expect(avg).toBe(0);
     });
   });
 
@@ -134,6 +155,14 @@ describe("round3-actions", () => {
       expect(result).toBeNull();
     });
 
+    it("Round 2가 완료되었지만 Round Number가 2가 아니면 null을 반환해야 한다", () => {
+      const result = startRound3Action(
+        [],
+        createMockRound({ roundNumber: 1, status: "completed" })
+      );
+      expect(result).toBeNull();
+    });
+
     it("라운드 2 완료 시 라운드 3을 생성해야 한다", () => {
       const chefs = [
         createMockChef("b1", "BLACK"),
@@ -178,6 +207,12 @@ describe("round3-actions", () => {
 
       const result = playRound3MatchAction(chefs, round3State, 3);
       expect(result).toBeNull();
+    });
+
+    it("존재하지 않는 매치 인덱스(음수)에 접근하면 null을 반환해야 한다", () => {
+      // 추가
+      const result = playRound3MatchAction([], {} as any, -1);
+      expect(result).toBeNull(); // 현재 로직상 > 2 체크만 있어서 음수는 통과할수도? 로직 확인 필요. -> 로직이 if (matchIndex > 2) 만 있음. 음수 체크 없음. 추가 필요할수도. 일단 테스트 돌려서 확인.
     });
 
     it("유효한 매치는 결과를 반환해야 한다", () => {

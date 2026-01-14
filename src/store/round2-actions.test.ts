@@ -90,6 +90,23 @@ describe("round2-actions", () => {
       expect(matches[0].blackDish).toBeDefined();
       expect(matches[0].whiteDish).toBeDefined();
     });
+
+    it("인원수가 맞지 않으면 더 적은 쪽에 맞춰 매칭하고 남는 인원은 제외해야 한다", () => {
+      const blackChefs = [
+        createMockChef("b1", "BLACK"),
+        createMockChef("b2", "BLACK"),
+        createMockChef("b3", "BLACK"),
+      ];
+      const whiteChefs = [createMockChef("w1", "WHITE")];
+
+      const matches = createRound2Matches(blackChefs, whiteChefs);
+      expect(matches).toHaveLength(1);
+    });
+
+    it("한쪽 진영이 없으면 매칭이 생성되지 않아야 한다", () => {
+      const matches = createRound2Matches([], [createMockChef("w1")]);
+      expect(matches).toHaveLength(0);
+    });
   });
 
   describe("startRound2Action", () => {
@@ -163,6 +180,44 @@ describe("round2-actions", () => {
       expect(result?.winnerId).toBeDefined();
       expect(result?.loserId).toBeDefined();
       expect(result?.votes).toHaveLength(2);
+    });
+
+    it("투표가 1:1로 갈리면 isTie가 true여야 한다", () => {
+      // P: 흑(맛 승), A: 백(완성도 승) 유도
+      const blackDish = {
+        id: "b-dish",
+        chefId: "b1",
+        name: "B",
+        description: "",
+        tags: [],
+        scores: { taste: 100, completeness: 0, creativity: 0 },
+      };
+      const whiteDish = {
+        id: "w-dish",
+        chefId: "w1",
+        name: "W",
+        description: "",
+        tags: [],
+        scores: { taste: 0, completeness: 100, creativity: 100 },
+      };
+
+      const match: Match = {
+        id: "m1",
+        blackChefId: "b1",
+        whiteChefId: "w1",
+        mainIngredient: "Test",
+        blackDish,
+        whiteDish,
+        votes: [],
+        isTie: false,
+        status: "ready",
+      };
+
+      const result = judgeMatchLogic(match);
+
+      expect(result).not.toBeNull();
+      expect(result?.isTie).toBe(true);
+      expect(result?.votes[0].pick).not.toBe(result?.votes[1].pick);
     });
   });
 });

@@ -118,7 +118,7 @@ export const playRound3MatchAction = (
   round3State: Round3State,
   matchIndex: number
 ): Round3MatchResult | null => {
-  if (matchIndex > 2) return null;
+  if (matchIndex < 0 || matchIndex > 2) return null;
 
   const blackTeam = chefs.filter(
     (c) => c.rank === "BLACK" && c.status === "alive"

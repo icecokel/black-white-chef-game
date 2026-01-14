@@ -77,6 +77,28 @@ describe("round-logic", () => {
       const passRate = calculatePassRate(midChef);
       expect(passRate).toBe(25);
     });
+
+    it("모든 스탯이 0이면 합격률은 0이어야 한다", () => {
+      const chef = createMockChef("zero", {
+        proficiency: 0,
+        creativity: 0,
+        taste: 0,
+        mental: 0,
+        speed: 0,
+      });
+      expect(calculatePassRate(chef)).toBe(0);
+    });
+
+    it("모든 스탯이 100이면 합격률은 50이어야 한다 (최대 점수)", () => {
+      const chef = createMockChef("max", {
+        proficiency: 100,
+        creativity: 100,
+        taste: 100,
+        mental: 100,
+        speed: 100,
+      });
+      expect(calculatePassRate(chef)).toBe(50);
+    });
   });
 
   describe("judgeChef", () => {
