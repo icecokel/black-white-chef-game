@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useChefStore } from "../store/useChefStore";
-import { Button } from "./ui/button";
 import { ChefCard } from "./ChefCard";
 import type { Dish, Match } from "../types/match";
 import { Round2MatchList } from "./Round2MatchList";
@@ -57,8 +56,8 @@ export const Round2View = () => {
     const myPickSide = userPicks.includes(match.blackChefId)
       ? "BLACK"
       : userPicks.includes(match.whiteChefId)
-      ? "WHITE"
-      : null;
+        ? "WHITE"
+        : null;
 
     return (
       <Round2MatchDetail
@@ -103,7 +102,14 @@ const Round2MatchDetail = ({
     }, 2000); // 2초 두근두근
 
     return () => clearTimeout(timer);
-  }, [match.id]);
+    // 결과 공개 후 2.5초 뒤 자동 다음 매치
+    if (showResult) {
+      const timer = setTimeout(() => {
+        onNext();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [showResult, onNext]);
 
   const blackChef = chefs.find((c) => c.id === match.blackChefId);
   const whiteChef = chefs.find((c) => c.id === match.whiteChefId);
@@ -224,9 +230,7 @@ const Round2MatchDetail = ({
                         : "text-white"
                     }`}
                   >
-                    {getVoteResult("P") === "BLACK"
-                      ? "⚫️ 흑수저"
-                      : "⚪️ 백수저"}
+                    {getVoteResult("P") === "BLACK" ? "⚫️ 흑수저" : "⚪️ 백수저"}
                   </div>
                 </div>
                 <div className="text-xs text-gray-400 italic max-w-[140px] text-right border-l border-gray-600 pl-3">
@@ -247,9 +251,7 @@ const Round2MatchDetail = ({
                         : "text-white"
                     }`}
                   >
-                    {getVoteResult("A") === "BLACK"
-                      ? "⚫️ 흑수저"
-                      : "⚪️ 백수저"}
+                    {getVoteResult("A") === "BLACK" ? "⚫️ 흑수저" : "⚪️ 백수저"}
                   </div>
                 </div>
                 <div className="text-xs text-gray-400 italic max-w-[140px] text-right border-l border-gray-600 pl-3">
@@ -285,13 +287,7 @@ const Round2MatchDetail = ({
                 </div>
               )}
 
-              <Button
-                size="lg"
-                className="w-full mt-2 bg-white text-black hover:bg-gray-200 font-bold py-4 text-lg"
-                onClick={onNext}
-              >
-                다음 ➡️
-              </Button>
+              {/* Button Removed for Auto-Next */}
             </div>
           )}
         </div>

@@ -31,7 +31,7 @@ export const revealAdditionalStat = (chef: Chef): Chef => {
 // 라운드 2 매칭 생성
 export const createRound2Matches = (
   aliveBlack: Chef[],
-  aliveWhite: Chef[]
+  aliveWhite: Chef[],
 ): Match[] => {
   const shuffledBlack = [...aliveBlack].sort(() => Math.random() - 0.5);
   const shuffledWhite = [...aliveWhite].sort(() => Math.random() - 0.5);
@@ -65,7 +65,7 @@ export const createRound2Matches = (
 // 라운드 2 시작 액션
 export const startRound2Action = (
   chefs: Chef[],
-  currentRound: Round | null
+  currentRound: Round | null,
 ): { newRound: Round; updatedChefs: Chef[] } | null => {
   if (
     !currentRound ||
@@ -76,10 +76,10 @@ export const startRound2Action = (
   }
 
   const aliveBlack = chefs.filter(
-    (c) => c.rank === "BLACK" && c.status === "alive"
+    (c) => c.rank === "BLACK" && c.status === "alive",
   );
   const aliveWhite = chefs.filter(
-    (c) => c.rank === "WHITE" && c.status === "alive"
+    (c) => c.rank === "WHITE" && c.status === "alive",
   );
 
   const matches = createRound2Matches(aliveBlack, aliveWhite);
@@ -121,36 +121,60 @@ export interface JudgeMatchResult {
   winnerId: string;
   loserId: string;
   isTie: boolean;
+  blackBoost?: number; // 적용된 부스트 (디버깅용)
+  whiteBoost?: number;
 }
 
-export const judgeMatchLogic = (match: Match): JudgeMatchResult | null => {
+// 부스트 계산: 1~4명(100%), 5명(90%) ... 9명(50%), 10명 이상(0%)
+// 공식: min(1.0, 1.4 - survivors * 0.1)
+const calculateBoost = (survivors: number): number => {
+  if (survivors >= 10) return 0;
+  return Math.min(1.0, 1.4 - survivors * 0.1);
+};
+
+export const judgeMatchLogic = (
+  match: Match,
+  blackSurvivors: number = 20, // 기본값: 부스트 없음
+  whiteSurvivors: number = 20,
+): JudgeMatchResult | null => {
   if (match.status === "completed" || !match.blackDish || !match.whiteDish) {
     return null;
   }
 
   const { blackDish, whiteDish } = match;
 
-  // Judge P (Taste 70%, Completeness 30%)
-  const scoreP_Black =
-    blackDish.scores.taste * 0.7 + blackDish.scores.completeness * 0.3;
-  const scoreP_White =
-    whiteDish.scores.taste * 0.7 + whiteDish.scores.completeness * 0.3;
+  // 부스트 계산
+  const blackBoost = calculateBoost(blackSurvivors);
+  const whiteBoost = calculateBoost(whiteSurvivors);
+
+  // Judge P (맛 60%, 완성도 30%, 창의성 10%)
+  const rawScoreP_Black =
+    blackDish.scores.taste * 0.6 +
+    blackDish.scores.completeness * 0.3 +
+    blackDish.scores.creativity * 0.1;
+  const rawScoreP_White =
+    whiteDish.scores.taste * 0.6 +
+    whiteDish.scores.completeness * 0.3 +
+    whiteDish.scores.creativity * 0.1;
+
+  // 부스트 적용
+  const scoreP_Black = rawScoreP_Black * (1 + blackBoost);
+  const scoreP_White = rawScoreP_White * (1 + whiteBoost);
   const voteP = scoreP_Black >= scoreP_White ? "black" : "white";
 
-  // Judge A (Completeness 40%, Creativity 30%, Taste 30%)
-  const effectiveCompletenessBlack =
-    blackDish.scores.completeness < 50 ? 0 : blackDish.scores.completeness;
-  const effectiveCompletenessWhite =
-    whiteDish.scores.completeness < 50 ? 0 : whiteDish.scores.completeness;
+  // Judge A (완성도 50%, 창의성 25%, 맛 25%)
+  const rawScoreA_Black =
+    blackDish.scores.completeness * 0.5 +
+    blackDish.scores.creativity * 0.25 +
+    blackDish.scores.taste * 0.25;
+  const rawScoreA_White =
+    whiteDish.scores.completeness * 0.5 +
+    whiteDish.scores.creativity * 0.25 +
+    whiteDish.scores.taste * 0.25;
 
-  const scoreA_Black =
-    effectiveCompletenessBlack * 0.4 +
-    blackDish.scores.creativity * 0.3 +
-    blackDish.scores.taste * 0.3;
-  const scoreA_White =
-    effectiveCompletenessWhite * 0.4 +
-    whiteDish.scores.creativity * 0.3 +
-    whiteDish.scores.taste * 0.3;
+  // 부스트 적용
+  const scoreA_Black = rawScoreA_Black * (1 + blackBoost);
+  const scoreA_White = rawScoreA_White * (1 + whiteBoost);
   const voteA = scoreA_Black >= scoreA_White ? "black" : "white";
 
   let winnerId: string;
@@ -179,5 +203,12 @@ export const judgeMatchLogic = (match: Match): JudgeMatchResult | null => {
   const loserId =
     winnerId === match.blackChefId ? match.whiteChefId : match.blackChefId;
 
-  return { votes, winnerId, loserId, isTie };
+  return {
+    votes,
+    winnerId,
+    loserId,
+    isTie,
+    blackBoost: blackBoost > 0 ? blackBoost : undefined,
+    whiteBoost: whiteBoost > 0 ? whiteBoost : undefined,
+  };
 };
