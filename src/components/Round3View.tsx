@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { useChefStore } from "../store/useChefStore";
-import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/Badge";
 import { ChefCard } from "./ChefCard";
@@ -385,7 +384,7 @@ export const Round3View = () => {
               />
             </div>
           ) : (
-            <CookingStateDisplay team="black" isActive={isCooking} />
+            <CookingStateDisplay isActive={isCooking} />
           )}
         </div>
 
@@ -414,7 +413,7 @@ export const Round3View = () => {
               />
             </div>
           ) : (
-            <CookingStateDisplay team="white" isActive={isCooking} />
+            <CookingStateDisplay isActive={isCooking} />
           )}
         </div>
       </div>
@@ -729,13 +728,7 @@ const cookingVariants: Record<string, { initial?: any; animate: any }> = {
   },
 };
 
-const CookingStateDisplay = ({
-  team,
-  isActive,
-}: {
-  team: "black" | "white";
-  isActive: boolean;
-}) => {
+const CookingStateDisplay = ({ isActive }: { isActive: boolean }) => {
   const [stateIndex, setStateIndex] = useState(0);
 
   useEffect(() => {

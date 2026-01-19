@@ -441,7 +441,7 @@ describe("round3-actions", () => {
 
       // 최소 2표 (20점) 보장
       expect(result?.blackVotes).toBeGreaterThanOrEqual(2);
-      expect(result?.blackVotes * 10).toBeGreaterThanOrEqual(20);
+      expect((result?.blackVotes ?? 0) * 10).toBeGreaterThanOrEqual(20);
       expect(result?.whiteVotes).toBeLessThanOrEqual(8);
     });
 

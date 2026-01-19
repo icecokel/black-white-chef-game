@@ -136,7 +136,6 @@ export const playRound3MatchAction = (
 
   // 현재 라운드의 심사위원
   const judges = round3State.judges;
-  const totalJudges = judges.length;
 
   // 1. 초기 투표 (순수 점수 기반)
   const initialVotes = judges.map((judge) => {
