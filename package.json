@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:r1": "VITE_START_ROUND=1 vite",
+    "dev:r2": "VITE_START_ROUND=2 vite",
+    "dev:r3": "VITE_START_ROUND=3 vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",

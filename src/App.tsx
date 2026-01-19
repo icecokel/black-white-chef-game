@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChefGrid } from "./components/ChefGrid";
 import { InitialScreen } from "./components/InitialScreen";
 import { GameTabs, type TabType } from "./components/GameTabs";
@@ -13,7 +13,32 @@ type GameState = "intro" | "playing" | "result";
 function App() {
   const [gameState, setGameState] = useState<GameState>("intro");
   const [activeTab, setActiveTab] = useState<TabType>("round");
-  const { initializeGame, chefs, currentRound } = useChefStore();
+  const { initializeGame, startRound2, startRound3, chefs, currentRound } =
+    useChefStore();
+
+  // 환경 변수로 라운드 스킵 (테스트용)
+  // 사용법: npm run dev:r2 또는 npm run dev:r3
+  useEffect(() => {
+    const startRound = import.meta.env.VITE_START_ROUND;
+
+    if (startRound && gameState === "intro") {
+      const targetRound = parseInt(startRound, 10);
+      if (targetRound >= 1 && targetRound <= 3) {
+        console.log(`🚀 라운드 ${targetRound}로 바로 시작합니다...`);
+        initializeGame();
+        setGameState("playing");
+
+        if (targetRound >= 2) {
+          setTimeout(() => {
+            startRound2();
+            if (targetRound === 3) {
+              setTimeout(() => startRound3(), 100);
+            }
+          }, 100);
+        }
+      }
+    }
+  }, []);
 
   const handleStartGame = () => {
     initializeGame();
