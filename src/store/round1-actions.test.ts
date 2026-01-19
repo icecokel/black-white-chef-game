@@ -122,7 +122,7 @@ describe("round1-actions", () => {
 
     it("심사 시작 시 cookingChefIds와 judgingQueue를 반환해야 한다", () => {
       const chefs = Array.from({ length: 10 }, (_, i) =>
-        createMockChef(`chef${i}`)
+        createMockChef(`chef${i}`),
       );
       const round = createMockRound();
 
@@ -238,11 +238,175 @@ describe("round1-actions", () => {
       const result = processEliminatedChefsAction(
         eliminatedChefs,
         eliminatedIds,
-        1
+        1,
       );
 
       expect(result.chefsToRevive).toHaveLength(1);
       expect(result.chefsToRevive[0].id).toBe("high");
+    });
+  });
+  describe("Cycle End Logic Scenarios", () => {
+    it("Case 0: Pass(22) >= Target(20) -> 성적순 상위 20명만 합격, 초과 2명 탈락", () => {
+      // 22명의 합격자를 성적순으로 정렬하고 상위 20명만 합격
+      const passedChefs = Array.from({ length: 22 }, (_, i) =>
+        createMockChef(`pass${i}`, {
+          stats: {
+            proficiency: 100 - i * 2, // 100, 98, 96... (높은 순서대로)
+            creativity: 50,
+            taste: 50,
+            mental: 50,
+            speed: 50,
+          },
+        }),
+      );
+      const passedIds = passedChefs.map((c) => c.id);
+
+      // processPendingChefsAction을 사용하여 초과분 컷 테스트
+      // (실제로는 useChefStore에서 처리하지만, 로직 검증용)
+      const result = processPendingChefsAction(passedChefs, passedIds, 20);
+
+      console.log(`\n[Case 0 Test] Pass: ${passedChefs.length}, Target: 20`);
+      console.log(
+        `[Case 0 Result] 최종 합격: ${result.chefsToPass.length}명, 컷: ${result.chefsToEliminate.length}명`,
+      );
+      console.log(
+        `[Case 0 상위 합격 점수] ${result.chefsToPass[0]?.stats.proficiency}점`,
+      );
+      console.log(
+        `[Case 0 컷된 최고 점수] ${result.chefsToEliminate[0]?.stats.proficiency}점`,
+      );
+
+      expect(result.chefsToPass).toHaveLength(20);
+      expect(result.chefsToEliminate).toHaveLength(2);
+
+      // 합격자 최저 점수 > 탈락자 최고 점수
+      const minPassScore = Math.min(
+        ...result.chefsToPass.map((c) => c.stats.proficiency),
+      );
+      const maxFailScore = Math.max(
+        ...result.chefsToEliminate.map((c) => c.stats.proficiency),
+      );
+      expect(minPassScore).toBeGreaterThan(maxFailScore);
+    });
+
+    it("Case 1-1: Pass(5) + Pending(6) < Target(20) -> Pending 전원 Pass, 부족분(9) 부활", () => {
+      const pendingChefs = Array.from({ length: 6 }, (_, i) =>
+        createMockChef(`p${i}`),
+      );
+      const pendingIds = pendingChefs.map((c) => c.id);
+
+      // Target 20, Current Pass 5 -> Remaining 15
+      // Total Potential 5 + 6 = 11 < 20
+
+      // 1. All pending pass (슬롯: 15, 보류자: 6 -> 전원 통과)
+      const pendingResult = processPendingChefsAction(
+        pendingChefs,
+        pendingIds,
+        15,
+      );
+
+      // 2. Revive remaining (슬롯: 15 - 6 = 9)
+      const eliminatedChefs = Array.from({ length: 20 }, (_, i) =>
+        createMockChef(`e${i}`, {
+          status: "eliminated",
+          stats: {
+            proficiency: i * 5, // 0, 5, 10... (역순으로 높은 점수가 뒤에)
+            creativity: 0,
+            taste: 0,
+            mental: 0,
+            speed: 0,
+          },
+        }),
+      );
+      const eliminatedIds = eliminatedChefs.map((c) => c.id);
+      const slotsAfterPending = 15 - 6; // 9
+
+      const reviveResult = processEliminatedChefsAction(
+        eliminatedChefs,
+        eliminatedIds,
+        slotsAfterPending,
+      );
+
+      console.log(
+        `\n[Case 1-1 Test] Pass: 5, Pending: 6, Fail: ${eliminatedChefs.length}`,
+      );
+      console.log(
+        `[Case 1-1 계산] 남은 슬롯: 15, 보류자 합격: 6, 부활 필요: 9`,
+      );
+      console.log(
+        `[Case 1-1 Result] Pending 합격: ${pendingResult.chefsToPass.length}명, 부활: ${reviveResult.chefsToRevive.length}명`,
+      );
+
+      expect(pendingResult.chefsToPass).toHaveLength(6); // All Pending Passed
+      expect(pendingResult.chefsToEliminate).toHaveLength(0); // No one cut
+      expect(reviveResult.chefsToRevive).toHaveLength(9);
+    });
+
+    it("Case 1-2: Pass(15) + Pending(5) === Target(20) -> Pending 전원 Pass, 부활 없음", () => {
+      const pendingChefs = Array.from({ length: 5 }, (_, i) =>
+        createMockChef(`p${i}`),
+      );
+      const pendingIds = pendingChefs.map((c) => c.id);
+
+      // Target 20, Current Pass 15 -> Remaining 5
+      // Total Potential 15 + 5 = 20 === 20
+
+      const pendingResult = processPendingChefsAction(
+        pendingChefs,
+        pendingIds,
+        5,
+      );
+
+      console.log(`\n[Case 1-2 Test] Pass: 15, Pending: 5, Target: 20`);
+      console.log(
+        `[Case 1-2 Result] Pending 합격: ${pendingResult.chefsToPass.length}명, 탈락: ${pendingResult.chefsToEliminate.length}명`,
+      );
+
+      expect(pendingResult.chefsToPass).toHaveLength(5); // All Pending Passed
+      expect(pendingResult.chefsToEliminate).toHaveLength(0); // Exact match, no cut
+    });
+
+    it("Case 2: Pass(15) + Pending(10) > Target(20) -> Pending 중 5명 Pass, 5명 Fail", () => {
+      const pendingChefs = Array.from({ length: 10 }, (_, i) =>
+        createMockChef(`p${i}`, {
+          stats: {
+            proficiency: i * 10, // 0, 10, 20... 90 (뒤로 갈수록 높음)
+            creativity: 0,
+            taste: 0,
+            mental: 0,
+            speed: 0,
+          },
+        }),
+      );
+      const pendingIds = pendingChefs.map((c) => c.id);
+
+      // Target 20, Current Pass 15 -> Remaining 5
+
+      const result = processPendingChefsAction(pendingChefs, pendingIds, 5);
+
+      console.log(`\n[Case 2 Test] Pass: 15, Pending: 10, Target: 20`);
+      console.log(
+        `[Case 2 Result] Pending 합격: ${result.chefsToPass.length}명, 탈락: ${result.chefsToEliminate.length}명`,
+      );
+      console.log(
+        `[Case 2 합격 점수] ${result.chefsToPass.map((c) => c.stats.proficiency).join(", ")}`,
+      );
+      console.log(
+        `[Case 2 탈락 점수] ${result.chefsToEliminate.map((c) => c.stats.proficiency).join(", ")}`,
+      );
+
+      expect(result.chefsToPass).toHaveLength(5);
+      expect(result.chefsToEliminate).toHaveLength(5);
+
+      // High score -> Pass (90, 80, 70, 60, 50)
+      const passedScores = result.chefsToPass.map((c) => c.stats.proficiency);
+      const failedScores = result.chefsToEliminate.map(
+        (c) => c.stats.proficiency,
+      );
+
+      expect(Math.min(...passedScores)).toBeGreaterThan(
+        Math.max(...failedScores),
+      );
     });
   });
 });

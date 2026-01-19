@@ -38,7 +38,7 @@ export const createSpeedWeightedOrder = (chefs: Chef[]): string[] => {
 // 자동 선택 로직
 export const autoPickBlackChefsAction = (
   chefs: Chef[],
-  currentRound: Round | null
+  currentRound: Round | null,
 ): { selectedIds: string[] } | null => {
   if (!currentRound || currentRound.status !== "picking") return null;
 
@@ -48,7 +48,7 @@ export const autoPickBlackChefsAction = (
   if (needToPick <= 0) return null;
 
   const availableChefs = chefs.filter(
-    (c) => c.rank === "BLACK" && c.status === "alive" && !c.isPlayerPick
+    (c) => c.rank === "BLACK" && c.status === "alive" && !c.isPlayerPick,
   );
 
   const shuffled = [...availableChefs].sort(() => Math.random() - 0.5);
@@ -60,7 +60,7 @@ export const autoPickBlackChefsAction = (
 // 심사 시작 로직
 export const startRound1JudgingAction = (
   chefs: Chef[],
-  currentRound: Round | null
+  currentRound: Round | null,
 ): {
   cookingChefIds: string[];
   judgingQueue: string[];
@@ -69,7 +69,7 @@ export const startRound1JudgingAction = (
   if (!currentRound || currentRound.status !== "picking") return null;
 
   const aliveBlackChefs = chefs.filter(
-    (c) => c.rank === "BLACK" && c.status === "alive"
+    (c) => c.rank === "BLACK" && c.status === "alive",
   );
 
   if (aliveBlackChefs.length === 0) return null;
@@ -98,7 +98,7 @@ export const startRound1JudgingAction = (
 // 요리 완료 처리 로직
 export const advanceRound1CookingAction = (
   chefs: Chef[],
-  currentRound: Round | null
+  currentRound: Round | null,
 ):
   | (CookingResult & { remainingCooking: string[]; completedIds: string[] })
   | null => {
@@ -117,7 +117,7 @@ export const advanceRound1CookingAction = (
     .filter((c): c is Chef => c !== undefined);
 
   const messages = completedChefs.map(
-    (chef) => `🍽️ ${chef.nickname} 요리 완료!`
+    (chef) => `🍽️ ${chef.nickname} 요리 완료!`,
   );
 
   if (remainingCooking.length === 0) {
@@ -128,9 +128,10 @@ export const advanceRound1CookingAction = (
 };
 
 // 심사 진행 로직 (배치 심사)
+// 주의: 여기서는 judgeChef 결과를 그대로 기록. 슬롯 조정은 사이클 종료 시 처리.
 export const judgeRound1BatchAction = (
   chefs: Chef[],
-  currentRound: Round
+  currentRound: Round,
 ): {
   batchChefs: Chef[];
   results: JudgingResult[];
@@ -139,14 +140,11 @@ export const judgeRound1BatchAction = (
   newPending: string[];
   newEliminated: string[];
 } | null => {
-  const { judgingQueue, currentJudgingIndex, passedChefIds, targetPassCount } =
-    currentRound;
-
-  const remainingSlots = targetPassCount - passedChefIds.length;
+  const { judgingQueue, currentJudgingIndex } = currentRound;
 
   const batchIds = judgingQueue.slice(
     currentJudgingIndex,
-    currentJudgingIndex + JUDGING_BATCH_SIZE
+    currentJudgingIndex + JUDGING_BATCH_SIZE,
   );
   const batch = batchIds
     .map((id) => chefs.find((c) => c.id === id))
@@ -154,20 +152,8 @@ export const judgeRound1BatchAction = (
 
   if (batch.length === 0) return null;
 
-  const rawResults = batch.map((chef) => judgeChef(chef));
-
-  let passCount = 0;
-  const results: JudgingResult[] = rawResults.map((result) => {
-    if (result === "pass") {
-      if (passCount < remainingSlots) {
-        passCount++;
-        return "pass";
-      } else {
-        return "pending";
-      }
-    }
-    return result;
-  });
+  // judgeChef 결과 그대로 사용 (pass→pending 강제 변환 제거)
+  const results: JudgingResult[] = batch.map((chef) => judgeChef(chef));
 
   const messages = batch.map((chef, i) => {
     const result = results[i];
@@ -190,7 +176,7 @@ export const judgeRound1BatchAction = (
 export const processPendingChefsAction = (
   chefs: Chef[],
   pendingChefIds: string[],
-  remainingSlots: number
+  remainingSlots: number,
 ): {
   chefsToPass: Chef[];
   chefsToEliminate: Chef[];
@@ -219,7 +205,7 @@ export const processPendingChefsAction = (
 export const processEliminatedChefsAction = (
   chefs: Chef[],
   eliminatedChefIds: string[],
-  remainingSlots: number
+  remainingSlots: number,
 ): {
   chefsToRevive: Chef[];
   messages: string[];
