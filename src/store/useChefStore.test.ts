@@ -29,7 +29,7 @@ describe("useChefStore", () => {
       const { currentRound } = useChefStore.getState();
 
       expect(currentRound?.targetPassCount).toBe(20);
-      expect(currentRound?.userPickLimit).toBe(2);
+      expect(currentRound?.userPickLimit).toBe(5);
       expect(currentRound?.passedChefIds).toHaveLength(0);
       expect(currentRound?.eliminatedChefIds).toHaveLength(0);
     });
@@ -121,7 +121,7 @@ describe("useChefStore", () => {
       useChefStore.getState().autoPickBlackChefs();
       const userPicks = useChefStore.getState().getUserPicks();
 
-      expect(userPicks).toHaveLength(2);
+      expect(userPicks).toHaveLength(5);
     });
 
     it("이미 일부 선택된 상태에서 나머지를 채워야 한다", () => {
@@ -134,7 +134,7 @@ describe("useChefStore", () => {
       useChefStore.getState().autoPickBlackChefs();
       const userPicks = useChefStore.getState().getUserPicks();
 
-      expect(userPicks).toHaveLength(2);
+      expect(userPicks).toHaveLength(5);
     });
   });
 

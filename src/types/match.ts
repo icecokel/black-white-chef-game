@@ -21,6 +21,8 @@ export interface Vote {
   comment: string;
 }
 
+import type { Judge } from "./judge";
+
 export interface Match {
   id: string;
   blackChefId: string;
@@ -33,4 +35,5 @@ export interface Match {
   loserId?: string; // 패자 ID
   isTie: boolean; // 보류 상태 (1:1)
   status: "ready" | "cooking" | "judging" | "completed";
+  judgesSnapshot?: Judge[]; // Round 3용: 해당 매치에 참여한 심사위원 스냅샷
 }

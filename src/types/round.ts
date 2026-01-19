@@ -39,4 +39,4 @@ export interface Round {
 }
 
 export const ROUND_1_TARGET_PASS_COUNT = 20;
-export const ROUND_1_USER_PICK_LIMIT = 2;
+export const ROUND_1_USER_PICK_LIMIT = 5;

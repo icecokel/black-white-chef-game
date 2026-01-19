@@ -30,9 +30,9 @@ function App() {
 
         if (targetRound >= 2) {
           setTimeout(() => {
-            startRound2();
+            startRound2(true);
             if (targetRound === 3) {
-              setTimeout(() => startRound3(), 100);
+              setTimeout(() => startRound3(true), 100);
             }
           }, 100);
         }

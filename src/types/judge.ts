@@ -1,3 +1,8 @@
+export interface VoteHistory {
+  matchIndex: number; // 1, 2, 3
+  pick: "BLACK" | "WHITE";
+}
+
 export interface Judge {
   id: string;
   name: string;
@@ -8,10 +13,7 @@ export interface Judge {
     completeness: number;
   };
   // 투표 이력
-  voteHistory: {
-    matchIndex: number; // 1, 2, 3
-    pick: "BLACK" | "WHITE";
-  }[];
+  voteHistory: VoteHistory[];
 }
 
 // 100명의 심사위원 생성 (랜덤 성향)
